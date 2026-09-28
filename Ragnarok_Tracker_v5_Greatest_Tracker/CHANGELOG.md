@@ -1,3 +1,15 @@
+# v5.2.1 — Music & Convenience Fixes
+
+- Activated the existing Welcome, Adventurer music-choice screen and wired Enter with Music / Enter Quietly behavior.
+- Reworked theme playback to call the HTML audio element directly from user gestures for better Safari/iPhone/PWA compatibility.
+- Added a visible “Tap to enable music” fallback when a browser blocks autoplay.
+- Removed the unnecessary Web Audio routing layer from background music while keeping quest UI sound effects independent.
+- Added clearer playing, paused, blocked, and load-error music states.
+- Added an iPhone/iPad Add to Home Screen helper modal and made the install control discoverable on iOS.
+- Kept the Favorite star visible on mobile quest rows.
+- Replaced the Cloud Join browser prompt with a styled pairing modal, paste helper, and pairing-code safety reminder.
+- Bumped application, API health, assets, and service-worker cache to v5.2.1.
+
 # v5.2.0 — Security Hardening
 
 - Added database-backed rate limiting for sync traffic, room creation, credential rotation/revocation, and failed authentication attempts.

@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.2.0"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.2.0">
+  <script src="/assets/theme-init.js?v=5.2.1"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.2.1">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -30,9 +30,9 @@
     <div class="welcome-panel" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
       <span class="eyebrow">Welcome, adventurer</span>
       <h2 id="welcome-title">Ready for your quests?</h2>
-      <p id="welcome-copy">Theme of Prontera is ready. Your browser may require one tap before sound can start.</p>
+      <p id="welcome-copy">Would you like to enter Prontera with music? You can change this anytime from Settings.</p>
       <div class="welcome-actions">
-        <button class="primary" id="enter-play" type="button">♫ Enter &amp; Play</button>
+        <button class="primary" id="enter-play" type="button">♫ Enter with Music</button>
         <button id="enter-quiet" type="button">Enter quietly</button>
       </div>
     </div>
@@ -69,6 +69,7 @@
 
       <div class="music-strip">
         <button id="music-toggle" type="button">♫ Play music</button>
+        <button class="music-unlock" id="music-unlock" type="button" hidden>♫ Tap to enable music</button>
         <label>Volume <input id="music-volume" type="range" min="0" max="100" value="35"></label>
         <button id="choose-music" type="button">Change music</button>
         <input id="music-file" type="file" accept="audio/*" hidden>
@@ -211,7 +212,7 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.2.0</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.2.1</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
       <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
@@ -280,7 +281,7 @@
       <div id="category-chips" class="category-chips"></div>
       <h4>About</h4>
       <div class="about-settings">
-        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.2.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.2.1 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
         <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/privacy.html">Privacy &amp; Security</a><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
       </div>
       <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Done</button></div>
@@ -295,6 +296,29 @@
     </form>
   </dialog>
 
+
+  <dialog id="cloud-join-dialog" class="modal">
+    <form method="dialog" id="cloud-join-form">
+      <div class="modal-head"><div><span class="section-kicker">Secure cloud pairing</span><h3>Join Cloud Sync ☁️</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">Paste the pairing code from your other device. Treat this code like a password and do not share it publicly.</p>
+      <label>Pairing code<textarea id="cloud-join-code" rows="4" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="RTNW-CLOUD-realm-…"></textarea></label>
+      <div class="pairing-safety">🔒 The code is used only to authenticate this device with your private cloud room.</div>
+      <div class="modal-actions"><button type="button" id="cloud-join-paste">Paste Code</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" type="button" id="cloud-join-submit">Connect Device</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="install-dialog" class="modal install-modal">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">iPhone &amp; iPad</span><h3>Add Tracker to Home Screen</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">Install the tracker like an app from Safari:</p>
+      <ol class="install-steps">
+        <li><strong>Tap Share ⬆</strong><span>Use Safari's Share button.</span></li>
+        <li><strong>Choose “Add to Home Screen”</strong><span>Scroll the Share menu if you do not see it immediately.</span></li>
+        <li><strong>Tap Add</strong><span>The tracker will appear on your Home Screen.</span></li>
+      </ol>
+      <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Got it</button></div>
+    </form>
+  </dialog>
 
   <dialog id="support-dialog" class="modal support-modal">
     <form method="dialog">
@@ -315,6 +339,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.2.0" defer></script>
+  <script src="/assets/app.js?v=5.2.1" defer></script>
 </body>
 </html>
