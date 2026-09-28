@@ -1,3 +1,17 @@
+# v5.3.0 — Adventure UI Upgrade
+
+- Added RPG-style category icons and per-category completion counters.
+- Upgraded server time, reset, and connection cards with clearer visual status and reset urgency.
+- Added percentage badges, animated progress bars, and completed-card styling for Dailies and Weeklies.
+- Added per-character accent colors that persist in local backups and cloud sync.
+- Added a lightweight quest-completion celebration that respects reduced-motion preferences.
+- Simplified Cloud Sync by keeping everyday actions visible and moving pairing/security controls into a Manage section.
+- Simplified Backups & Restore and moved manual sync codes into Advanced transfer tools.
+- Reorganized Settings into Appearance, Gameplay, Sound, Categories, Data & tools, and About sections.
+- Added a mobile bottom navigation for Today, Weekly, Character, and More.
+- Preserved v5.2 security hardening and the v5.2.1 music playback fixes.
+- Bumped application, API health, assets, and service-worker cache to v5.3.0.
+
 # v5.2.1 — Music & Convenience Fixes
 
 - Activated the existing Welcome, Adventurer music-choice screen and wired Enter with Music / Enter Quietly behavior.
@@ -8,7 +22,7 @@
 - Added an iPhone/iPad Add to Home Screen helper modal and made the install control discoverable on iOS.
 - Kept the Favorite star visible on mobile quest rows.
 - Replaced the Cloud Join browser prompt with a styled pairing modal, paste helper, and pairing-code safety reminder.
-- Bumped application, API health, assets, and service-worker cache to v5.2.1.
+- Bumped application, API health, assets, and service-worker cache to v5.3.0.
 
 # v5.2.0 — Security Hardening
 

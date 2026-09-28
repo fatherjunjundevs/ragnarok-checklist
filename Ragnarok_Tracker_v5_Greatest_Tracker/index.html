@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.2.1"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.2.1">
+  <script src="/assets/theme-init.js?v=5.3.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.3.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -25,6 +25,17 @@
   </div>
 
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="completion-celebration" class="completion-celebration" role="status" aria-live="polite" hidden>
+    <div class="celebration-sparkles" aria-hidden="true">
+      <span>✦</span><span>✨</span><span>✧</span><span>🌟</span><span>✦</span><span>✨</span>
+    </div>
+    <div class="celebration-card">
+      <span class="celebration-icon" aria-hidden="true">🏆</span>
+      <strong id="celebration-title">Daily Quests Complete!</strong>
+      <span id="celebration-copy">Great work, adventurer!</span>
+    </div>
+  </div>
 
   <div id="welcome" class="welcome" hidden>
     <div class="welcome-panel" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
@@ -60,11 +71,19 @@
         </div>
       </div>
 
-      <div class="server-strip">
-        <div><span>Server time</span><strong id="server-clock">--:--:--</strong><small>UTC+7</small></div>
-        <div><span>Daily reset</span><strong id="daily-countdown">--</strong><small>5:00 AM UTC+7</small></div>
-        <div><span>Weekly reset</span><strong>Monday</strong><small>5:00 AM UTC+7</small></div>
-        <div><span>Connection</span><strong id="network-status">Online</strong><small id="cloud-mini">Local save</small></div>
+      <div class="server-strip" aria-label="Server status">
+        <div class="server-stat server-time-card">
+          <span class="server-icon" aria-hidden="true">🕒</span><div class="server-stat-copy"><span>Server time</span><strong id="server-clock">--:--:--</strong><small>UTC+7</small></div>
+        </div>
+        <div class="server-stat daily-reset-card" id="daily-reset-card">
+          <span class="server-icon" aria-hidden="true">☀️</span><div class="server-stat-copy"><span>Daily reset</span><strong id="daily-countdown">--</strong><small>5:00 AM UTC+7</small></div>
+        </div>
+        <div class="server-stat weekly-reset-card">
+          <span class="server-icon" aria-hidden="true">✦</span><div class="server-stat-copy"><span>Weekly reset</span><strong>Monday</strong><small>5:00 AM UTC+7</small></div>
+        </div>
+        <div class="server-stat connection-card" id="connection-card">
+          <span class="server-icon" aria-hidden="true">☁️</span><div class="server-stat-copy"><span>Connection</span><strong id="network-status">Online</strong><small id="cloud-mini">Local save</small></div>
+        </div>
       </div>
 
       <div class="music-strip">
@@ -78,7 +97,7 @@
       </div>
     </header>
 
-    <section class="character-dock" aria-label="Character profiles">
+    <section class="character-dock" id="character-dock" aria-label="Character profiles">
       <div class="character-tabs" id="character-tabs"></div>
       <div class="character-tools">
         <button id="add-character" type="button">＋ Character</button>
@@ -105,6 +124,7 @@
             <p id="daily-date" class="muted"></p>
           </div>
           <div class="section-head-actions">
+            <span class="progress-percent" id="daily-percent">0%</span>
             <span class="count-badge" id="daily-count">0 / 0</span>
             <button class="collapse-btn" data-collapse="daily" type="button" aria-expanded="true">Collapse</button>
           </div>
@@ -130,6 +150,7 @@
             <p id="weekly-date" class="muted"></p>
           </div>
           <div class="section-head-actions">
+            <span class="progress-percent alt" id="weekly-percent">0%</span>
             <span class="count-badge alt" id="weekly-count">0 / 0</span>
             <button class="collapse-btn" data-collapse="weekly" type="button" aria-expanded="true">Collapse</button>
           </div>
@@ -149,35 +170,45 @@
     </section>
 
     <section class="utility-grid">
-      <article class="utility-card" id="cloud-card">
+      <article class="utility-card utility-feature-card" id="cloud-card">
         <div class="utility-title"><div><span class="section-kicker">Across devices</span><h3>☁ Cloud Sync</h3></div><span class="status-pill" id="cloud-status-pill">Checking…</span></div>
         <p id="cloud-status-text">Checking whether cloud sync is configured on this deployment.</p>
-        <div class="utility-actions">
-          <button class="primary" id="cloud-create" type="button">Create pairing</button>
+        <div class="utility-actions cloud-primary-actions">
+          <button class="primary" id="cloud-create" type="button">＋ Create pairing</button>
           <button id="cloud-join" type="button">Join with code</button>
-          <button id="cloud-sync-now" type="button">Sync now</button>
+          <button class="primary" id="cloud-sync-now" type="button">↻ Sync now</button>
           <button id="cloud-copy-code" type="button">Copy pairing code</button>
-          <button id="cloud-rotate" type="button">Rotate pairing code</button>
-          <button id="cloud-disconnect" type="button">Disconnect this device</button>
-          <button class="danger" id="cloud-revoke" type="button">Revoke pairing everywhere</button>
         </div>
-        <p class="tiny">Your pairing code works like a password. Keep it private. You can rotate it if it is exposed, or revoke the cloud pairing for every device. <a href="/privacy.html">Privacy &amp; Security</a></p>
+        <details class="utility-details" id="cloud-manage" hidden>
+          <summary>Manage pairing &amp; security</summary>
+          <div class="utility-actions utility-actions-secondary">
+            <button id="cloud-rotate" type="button">Rotate pairing code</button>
+            <button id="cloud-disconnect" type="button">Disconnect this device</button>
+            <button class="danger" id="cloud-revoke" type="button">Revoke pairing everywhere</button>
+          </div>
+        </details>
+        <p class="tiny">Your pairing code works like a password. Keep it private. <a href="/privacy.html">Privacy &amp; Security</a></p>
       </article>
 
-      <article class="utility-card">
+      <article class="utility-card utility-feature-card" id="backup-card">
         <div class="utility-title"><div><span class="section-kicker">Safety net</span><h3>↶ Backups &amp; Restore</h3></div><span class="status-pill good" id="snapshot-count">0 snapshots</span></div>
-        <p>Automatic local snapshots are created before destructive changes and periodically while you play.</p>
+        <p>Automatic local snapshots protect your tracker before destructive changes and while you play.</p>
         <div class="utility-actions">
-          <button id="restore-snapshot" type="button">Restore previous</button>
-          <button id="export-backup" type="button">Export JSON</button>
-          <button id="import-backup" type="button">Import JSON</button>
+          <button class="primary" id="restore-snapshot" type="button">↶ Restore previous</button>
+          <button id="export-backup" type="button">Export backup</button>
+          <button id="import-backup" type="button">Import backup</button>
           <input id="backup-file" type="file" accept="application/json,.json" hidden>
-          <button id="copy-sync-code" type="button">Copy manual sync code</button>
-          <button id="import-sync-code" type="button">Import manual sync code</button>
         </div>
+        <details class="utility-details">
+          <summary>Advanced transfer tools</summary>
+          <div class="utility-actions utility-actions-secondary">
+            <button id="copy-sync-code" type="button">Copy manual sync code</button>
+            <button id="import-sync-code" type="button">Import manual sync code</button>
+          </div>
+        </details>
       </article>
 
-      <article class="utility-card reminder-card">
+      <article class="utility-card reminder-card" id="reminder-card">
         <div class="utility-title"><div><span class="section-kicker">Before reset</span><h3>🔔 Reminders</h3></div><span class="status-pill" id="reminder-status">Off</span></div>
         <p>Optional browser reminders warn you when unfinished quests are approaching the daily reset.</p>
         <div class="reminder-row">
@@ -212,7 +243,7 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.2.1</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.3.0</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
       <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
@@ -220,6 +251,13 @@
       <span id="save-status">Saved locally</span>
     </footer>
   </main>
+
+  <nav class="mobile-nav" aria-label="Quick mobile navigation">
+    <button type="button" data-mobile-target="daily-card"><span aria-hidden="true">☀️</span><small>Today</small></button>
+    <button type="button" data-mobile-target="weekly-card"><span aria-hidden="true">✦</span><small>Weekly</small></button>
+    <button type="button" data-mobile-target="character-dock"><span aria-hidden="true">👤</span><small>Character</small></button>
+    <button type="button" id="mobile-more"><span aria-hidden="true">☰</span><small>More</small></button>
+  </nav>
 
   <audio id="theme-audio" loop preload="metadata" src="/assets/prontera.mp3"></audio>
 
@@ -247,6 +285,7 @@
         <label>Class / Job<input id="character-class" maxlength="40" placeholder="e.g. High Priest"></label>
         <label>Portrait<select id="character-avatar"><option>⚔️</option><option>✨</option><option>🛡️</option><option>🏹</option><option>🔮</option><option>🗡️</option><option>🐱</option><option>👑</option><option>🌸</option><option>🔥</option></select></label>
       </div>
+      <label>Character accent<select id="character-accent" class="accent-select"><option value="gold">🌟 Prontera Gold</option><option value="teal">💧 Aqua Teal</option><option value="violet">🔮 Rune Violet</option><option value="rose">🌸 Sakura Rose</option><option value="emerald">🍃 Forest Emerald</option><option value="sky">☁️ Sky Blue</option></select></label>
       <label class="checkline" id="character-copy-wrap"><input type="checkbox" id="character-copy-quests"> Copy quest setup from the active character</label>
       <div class="modal-actions"><button type="button" class="danger" id="character-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" id="character-save" value="default">Save character</button></div>
     </form>
@@ -267,23 +306,44 @@
   <dialog id="settings-dialog" class="modal wide">
     <form method="dialog" id="settings-form">
       <div class="modal-head"><div><span class="section-kicker">Tracker preferences</span><h3>Settings</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
-      <div class="settings-grid">
-        <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
-        <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
-        <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Fit more quests on screen.</small></span></label>
-        <label class="setting-tile"><input id="setting-ui-sounds" type="checkbox"><span><b>Quest UI sounds</b><small>Small confirmation tones for quest actions.</small></span></label>
-        <label class="setting-tile theme-setting"><span class="setting-icon" aria-hidden="true">◐</span><span><b>Appearance</b><small>Choose a light parchment theme, dark midnight theme, or follow this device.</small><select id="setting-theme" aria-label="Color theme"><option value="system">Device setting</option><option value="light">Light mode</option><option value="dark">Dark mode</option></select></span></label>
-        <label class="setting-tile"><input id="setting-autoplay" type="checkbox"><span><b>Try music autoplay</b><small>Attempt Prontera music on load when the browser allows it.</small></span></label>
-        <label class="setting-tile"><input id="setting-finish-auto" type="checkbox"><span><b>Suggest finish mode near reset</b><small>Highlight unfinished priorities in the final 2 hours.</small></span></label>
-      </div>
-      <h4>Category management</h4>
-      <div class="category-manager"><input id="new-category-name" maxlength="30" placeholder="New category"><button type="button" id="add-category">Add category</button></div>
-      <div id="category-chips" class="category-chips"></div>
-      <h4>About</h4>
-      <div class="about-settings">
-        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.2.1 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
-        <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/privacy.html">Privacy &amp; Security</a><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
-      </div>
+      <section class="settings-section">
+        <div class="settings-section-head"><span aria-hidden="true">🎨</span><div><h4>Appearance</h4><p>Choose how the tracker looks and how much fits on screen.</p></div></div>
+        <div class="settings-grid">
+          <label class="setting-tile theme-setting"><span class="setting-icon" aria-hidden="true">◐</span><span><b>Color mode</b><small>Use light parchment, dark midnight, or follow this device.</small><select id="setting-theme" aria-label="Color theme"><option value="system">Device setting</option><option value="light">Light mode</option><option value="dark">Dark mode</option></select></span></label>
+          <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Fit more quests on screen.</small></span></label>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-head"><span aria-hidden="true">⚔️</span><div><h4>Gameplay</h4><p>Control how completed and urgent quests are organized.</p></div></div>
+        <div class="settings-grid">
+          <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
+          <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
+          <label class="setting-tile"><input id="setting-finish-auto" type="checkbox"><span><b>Suggest finish mode near reset</b><small>Highlight unfinished priorities in the final 2 hours.</small></span></label>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-head"><span aria-hidden="true">🎵</span><div><h4>Sound</h4><p>Manage the Prontera theme and small quest confirmation sounds.</p></div></div>
+        <div class="settings-grid">
+          <label class="setting-tile"><input id="setting-ui-sounds" type="checkbox"><span><b>Quest UI sounds</b><small>Small confirmation tones for quest actions.</small></span></label>
+          <label class="setting-tile"><input id="setting-autoplay" type="checkbox"><span><b>Try music autoplay</b><small>Attempt Prontera music on load when the browser allows it.</small></span></label>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-head"><span aria-hidden="true">🏷️</span><div><h4>Categories</h4><p>Add your own quest groups. Default groups now include quick visual icons.</p></div></div>
+        <div class="category-manager"><input id="new-category-name" maxlength="30" placeholder="New category"><button type="button" id="add-category">Add category</button></div>
+        <div id="category-chips" class="category-chips"></div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-head"><span aria-hidden="true">🧰</span><div><h4>Data &amp; tools</h4><p>Jump directly to cloud sync, backups, or reminder controls.</p></div></div>
+        <div class="settings-shortcuts"><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
+      </section>
+      <section class="settings-section settings-about-section">
+        <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
+        <div class="about-settings">
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.3.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
+        </div>
+      </section>
       <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Done</button></div>
     </form>
   </dialog>
@@ -339,6 +399,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.2.1" defer></script>
+  <script src="/assets/app.js?v=5.3.0" defer></script>
 </body>
 </html>
