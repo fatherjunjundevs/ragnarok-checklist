@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.3.0
+# Ragnarok: The New World Tracker v5.4.0
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -22,6 +22,12 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 16. Appearance control with Light, Dark, and Device themes, plus a one-click theme switch in the header.
 17. RPG-style category icons, richer progress/status cards, and per-character accent colors.
 18. Mobile bottom navigation and a lightweight completion celebration for faster, more satisfying everyday use.
+19. Compact everyday header and a two-row mobile quick toolbar so quests appear sooner and core controls do not scroll offscreen.
+20. Organize mode with lifted/floating drag cards for clearer drag-and-drop quest reordering.
+21. Optional quest run counters with automatic completion at the target.
+22. All-character progress overview for quickly spotting unfinished dailies and weeklies.
+23. Short-session planner that suggests unfinished quests for 15–120 minute play windows using priorities, favorites, and editable duration estimates.
+24. Optional quest guidance for prerequisites, location, rewards, and notes behind an expandable details control.
 
 ## Appearance
 
@@ -32,6 +38,8 @@ Choose **Device setting**, **Light mode**, or **Dark mode** in Settings. A quick
 The app reads the previous local-storage keys (`ragnarok-new-world-checklist-v3` and v1) and migrates characters, quest checks, custom quests, and quest ordering into the v5 state model. Existing `Monster Etermination` data is corrected to `Monster Extermination`.
 
 Existing profiles upgrading from releases before v5.1.3 receive **Elite** once under the **Hunt** daily category if it is missing, without resetting the rest of their quest progress.
+
+v5.4 automatically gives existing quests a target of **1**, preserves completed/unfinished state as counter progress, uses a default **10-minute** duration estimate, and leaves the new guidance fields blank until the player adds them. No Supabase schema migration is required. After a cloud room has been updated by v5.4, older tracker clients are prevented from overwriting the newer quest fields; update all paired devices when the v5.4 service-worker prompt appears.
 
 ## Creator
 
@@ -123,6 +131,19 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.4.0 — Everyday Questing upgrade
+
+- Compacted the header and converted Prontera music controls into a small expandable player so quests appear sooner.
+- Rebuilt the mobile quick toolbar into two non-scrolling rows with character/reset/progress and everyday filters always visible.
+- Added **Organize mode**: edit/reorder controls stay out of the normal checklist and dragged quest cards visibly lift/follow the pointer while moving.
+- Rebalanced desktop layout so Dailies get the primary column and Weeklies share a compact sidebar with character overview and session planning.
+- Added optional run counters (`1 / 3`, etc.) with +/- controls and automatic completion when the target is reached. Counters reset with the server period.
+- Added an all-character overview showing daily/weekly completion and remaining work, with one-tap character switching.
+- Added a short-session planner for 15, 30, 45, 60, 90, or 120 minutes using editable quest duration estimates, priorities, and favorites.
+- Added optional quest guidance fields for prerequisites, location, rewards, and notes behind an expandable Quest details control.
+- Extended cloud-sync server validation for the new counter, duration, and guidance fields without requiring a Supabase schema change.
+- Preserved v5.2 security hardening, UTC+7 / 5:00 AM resets, the iOS drag fix, and the v5.2.1 Enter with Music behavior.
 
 ### v5.3.0 — Adventure UI upgrade
 
