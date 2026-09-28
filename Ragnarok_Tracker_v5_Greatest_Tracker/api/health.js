@@ -4,5 +4,5 @@ module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const cloudConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-  res.status(200).json({ ok: true, version: '5.2.0', cloudConfigured, securityHardening: true });
+  res.status(200).json({ ok: true, version: '5.2.1', cloudConfigured, securityHardening: true });
 };
