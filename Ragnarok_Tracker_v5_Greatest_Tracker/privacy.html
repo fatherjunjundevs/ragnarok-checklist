@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10274b">
+  <meta name="description" content="Privacy and security information for the unofficial Ragnarok: The New World Tracker by FatherJunJun.">
+  <meta name="author" content="FatherJunJun">
+  <title>Privacy & Security | Ragnarok Tracker by FatherJunJun</title>
+  <link rel="canonical" href="https://ragnarok-checklist.vercel.app/privacy.html">
+  <script src="/assets/theme-init.js?v=5.2.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.2.0">
+</head>
+<body>
+  <main class="app-shell privacy-shell">
+    <header class="privacy-hero">
+      <span class="eyebrow">FatherJunJun · v5.2</span>
+      <h1>Privacy &amp; Security</h1>
+      <p>This page explains what the tracker stores, what cloud sync sends to the server, how pairing codes work, and the security protections used by this unofficial fan-made project.</p>
+      <div class="privacy-hero-actions">
+        <a class="button-link" href="/">← Back to Tracker</a>
+        <a class="button-link" href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">☕ Support FatherJunJun</a>
+      </div>
+    </header>
+
+    <section class="privacy-grid" aria-label="Privacy and security details">
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">On your device</span>
+        <h2>Local data</h2>
+        <p>The tracker saves your characters, quest checks, notes, priorities, settings, history, and local restore snapshots in your browser so the app can work offline.</p>
+        <p>If cloud sync is connected, the browser also keeps the room ID and pairing secret needed for automatic synchronization. That credential is kept separately from tracker backups and is not included in exported tracker JSON.</p>
+      </article>
+
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">Optional</span>
+        <h2>Cloud sync</h2>
+        <p>Cloud sync sends your tracker state to the tracker server, which stores it in Supabase together with a room ID, revision number, and update timestamp.</p>
+        <p>The server does <strong>not</strong> store the pairing secret itself. It stores a SHA-256 hash used to verify future sync requests.</p>
+      </article>
+
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">Treat it like a password</span>
+        <h2>Pairing-code safety</h2>
+        <p>Anyone who obtains a valid pairing code can access that cloud room. Do not post it publicly, include it in screenshots, or send it to people you do not trust.</p>
+        <p>v5.2 lets you <strong>rotate</strong> the pairing code if it may have been exposed, or <strong>revoke</strong> the cloud pairing to invalidate it for every device.</p>
+      </article>
+
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">Abuse prevention</span>
+        <h2>Rate limiting</h2>
+        <p>The sync API limits unusually high request volumes, repeated room creation, and failed authentication attempts. For this protection, the server may temporarily store cryptographic hashes derived from network addresses and request counters. The tracker rate-limit table does not store the raw address.</p>
+        <p>Hosting and database providers may maintain their own operational or security logs under their respective policies.</p>
+      </article>
+
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">Payments</span>
+        <h2>Support links</h2>
+        <p>Support is optional. The tracker links to Buy Me a Coffee, which is a separate service. The tracker does not collect, process, or store your payment-card information.</p>
+      </article>
+
+      <article class="utility-card privacy-card">
+        <span class="section-kicker">Notifications &amp; music</span>
+        <h2>Browser features</h2>
+        <p>Notification permission is managed by your browser or device. A custom music file you choose is used locally in the current browser session and is not uploaded through cloud sync.</p>
+      </article>
+
+      <article class="utility-card privacy-card privacy-wide">
+        <span class="section-kicker">v5.2 protections</span>
+        <h2>Security controls</h2>
+        <ul>
+          <li>HTTPS with HSTS and additional browser security headers.</li>
+          <li>A Content Security Policy that restricts executable scripts and resource sources.</li>
+          <li>Clickjacking protection that prevents the tracker from being embedded in another site.</li>
+          <li>Server-side tracker-state validation and payload-size limits before cloud data is stored.</li>
+          <li>Generic cloud authentication errors so room existence is not disclosed.</li>
+          <li>Database-backed rate limits for sync traffic, room creation, credential rotation, revocation, and failed authentication.</li>
+          <li>Supabase Row Level Security with no public table policies; cloud database access is performed by the server.</li>
+        </ul>
+      </article>
+
+      <article class="utility-card privacy-card privacy-wide">
+        <span class="section-kicker">Your controls</span>
+        <h2>Disconnecting and deleting data</h2>
+        <p><strong>Disconnect this device</strong> removes the cloud credential from that browser but keeps its local tracker data. <strong>Revoke pairing everywhere</strong> deletes the cloud room and invalidates the pairing code for all devices while keeping the current device's local tracker data.</p>
+        <p>You can remove local tracker data by clearing site data for this website in your browser. Export a backup first if you want to keep a copy.</p>
+      </article>
+
+      <article class="utility-card privacy-card privacy-wide privacy-note">
+        <span class="section-kicker">Important</span>
+        <h2>No system is unhackable</h2>
+        <p>These controls reduce common risks, but no website or cloud service can guarantee absolute security. Keep your devices and browsers updated, protect your accounts with multi-factor authentication, and keep your pairing code private.</p>
+      </article>
+    </section>
+
+    <footer class="privacy-footer">
+      <strong>Ragnarok: The New World Tracker · v5.2.0 · Created by FatherJunJun</strong><br>
+      Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.<br>
+      Last updated: September 28, 2026 · <a href="/">Return to tracker</a>
+    </footer>
+  </main>
+</body>
+</html>

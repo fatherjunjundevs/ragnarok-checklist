@@ -1,7 +1,9 @@
-const CACHE = 'rtnw-tracker-v5.1.4';
+const CACHE = 'rtnw-tracker-v5.2.0';
 const CORE = [
-  '/', '/index.html', '/manifest.webmanifest', '/assets/app.css?v=5.1.4', '/assets/app.js?v=5.1.4',
-  '/assets/prontera.webp', '/assets/prontera.mp3', '/assets/fatherjunjun-support-qr.png', '/icon-192.png', '/icon-512.png'
+  '/', '/index.html', '/privacy.html', '/manifest.webmanifest',
+  '/assets/theme-init.js?v=5.2.0', '/assets/app.css?v=5.2.0', '/assets/app.js?v=5.2.0',
+  '/assets/prontera.webp', '/assets/prontera.mp3', '/assets/fatherjunjun-support-qr.png',
+  '/icon-192.png', '/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -21,9 +23,14 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/api/')) return;
 
   if (req.mode === 'navigate') {
+    const cacheKey = url.pathname === '/' ? '/index.html' : url.pathname;
     event.respondWith(fetch(req).then(res => {
-      const copy = res.clone(); caches.open(CACHE).then(c => c.put('/index.html', copy)); return res;
-    }).catch(() => caches.match('/index.html')));
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(cacheKey, copy));
+      }
+      return res;
+    }).catch(async () => (await caches.match(cacheKey)) || caches.match('/index.html')));
     return;
   }
 

@@ -15,19 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script>
-    (() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem('rtnw-tracker-v5') || 'null');
-        const pref = saved?.settings?.theme || 'system';
-        const wantsDark = pref === 'dark' || (pref === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
-        document.documentElement.dataset.theme = wantsDark ? 'dark' : 'light';
-      } catch (_) {
-        document.documentElement.dataset.theme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    })();
-  </script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.1.4">
+  <script src="/assets/theme-init.js?v=5.2.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.2.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -167,9 +156,11 @@
           <button id="cloud-join" type="button">Join with code</button>
           <button id="cloud-sync-now" type="button">Sync now</button>
           <button id="cloud-copy-code" type="button">Copy pairing code</button>
-          <button id="cloud-disconnect" type="button">Disconnect</button>
+          <button id="cloud-rotate" type="button">Rotate pairing code</button>
+          <button id="cloud-disconnect" type="button">Disconnect this device</button>
+          <button class="danger" id="cloud-revoke" type="button">Revoke pairing everywhere</button>
         </div>
-        <p class="tiny">Your pairing code works like a password. Keep it private. Local saving continues even when cloud sync is unavailable.</p>
+        <p class="tiny">Your pairing code works like a password. Keep it private. You can rotate it if it is exposed, or revoke the cloud pairing for every device. <a href="/privacy.html">Privacy &amp; Security</a></p>
       </article>
 
       <article class="utility-card">
@@ -220,9 +211,9 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.1.4</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.2.0</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
-      <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a></span>
+      <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
       <small>Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.</small>
       <span id="save-status">Saved locally</span>
@@ -289,8 +280,8 @@
       <div id="category-chips" class="category-chips"></div>
       <h4>About</h4>
       <div class="about-settings">
-        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.1.4 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
-        <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
+        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.2.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+        <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/privacy.html">Privacy &amp; Security</a><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
       </div>
       <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Done</button></div>
     </form>
@@ -324,6 +315,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.1.4" defer></script>
+  <script src="/assets/app.js?v=5.2.0" defer></script>
 </body>
 </html>

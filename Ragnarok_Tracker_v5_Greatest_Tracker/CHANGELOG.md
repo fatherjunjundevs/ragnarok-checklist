@@ -1,3 +1,18 @@
+# v5.2.0 — Security Hardening
+
+- Added database-backed rate limiting for sync traffic, room creation, credential rotation/revocation, and failed authentication attempts.
+- Cloud rooms are now created only through a dedicated rate-limited `create` action with server-generated 128-bit room IDs and 256-bit pairing secrets.
+- Added pairing-code rotation and full cloud-pairing revocation controls.
+- Made missing-room and incorrect-secret authentication failures indistinguishable to reduce room-ID enumeration.
+- Added strict server-side validation for tracker profiles, tasks, categories, settings, history, metadata, and payload size.
+- Added Content Security Policy (CSP), clickjacking protection, HSTS, stricter referrer policy, and additional browser security headers.
+- Moved startup theme logic to an external script so `script-src 'self'` can block inline script execution.
+- Minimized the cloud credential object stored in browser localStorage and validate it before use.
+- Added a Privacy & Security page explaining local storage, cloud sync, pairing-code safety, rate limiting, payment links, and data controls.
+- Added hashed-network-identifier rate-limit storage with RLS and service-role-only access in Supabase.
+- Fixed service-worker navigation caching so the Privacy & Security page cannot overwrite the offline home-page cache.
+- Bumped application, API health, PWA assets, and service-worker cache to v5.2.0.
+
 # v5.1.4
 
 - Added creator branding for FatherJunJun.
