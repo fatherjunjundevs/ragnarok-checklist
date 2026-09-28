@@ -1,13 +1,15 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.1.4';
+  const VERSION = '5.2.0';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
   const CLOUD_KEY = 'rtnw-tracker-v5-cloud';
+  const CLOUD_ROOM_RE = /^[a-z0-9-]{8,64}$/i;
+  const CLOUD_SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
   const REMINDER_KEY = 'rtnw-tracker-v5-reminders';
   const SERVER_OFFSET_MIN = 7 * 60;
   const RESET_HOUR = 5;
@@ -102,7 +104,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -123,6 +125,7 @@
   let cloudTimer = null;
   let cloudPollTimer = null;
   let cloudConfigured = false;
+  let cloudAuthInvalid = false;
   let cloud = loadCloud();
   dirtySinceCloud = !!(cloud && Date.parse(app.meta?.updatedAt || 0) > Date.parse(cloud.lastSync || 0));
   let swRegistration = null;
@@ -138,8 +141,20 @@
     try{ raw=localStorage.getItem(STORAGE_KEY); if(!raw){ for(const k of LEGACY_KEYS){raw=localStorage.getItem(k);if(raw)break;} } return normalizeApp(raw?JSON.parse(raw):null); }
     catch(e){ toast('Saved tracker data could not be read. A clean tracker was loaded.','bad'); return normalizeApp(null); }
   }
-  function loadCloud(){ try{ const x=JSON.parse(localStorage.getItem(CLOUD_KEY)||'null'); return x&&x.roomId&&x.secret?x:null; }catch(e){return null;} }
-  function saveCloud(){ try{ cloud?localStorage.setItem(CLOUD_KEY,JSON.stringify(cloud)):localStorage.removeItem(CLOUD_KEY); }catch(e){} }
+  function loadCloud(){
+    try{
+      const x=JSON.parse(localStorage.getItem(CLOUD_KEY)||'null');
+      if(!x || !CLOUD_ROOM_RE.test(String(x.roomId||'')) || !CLOUD_SECRET_RE.test(String(x.secret||''))) return null;
+      return {roomId:String(x.roomId),secret:String(x.secret),revision:Math.max(0,Number(x.revision)||0),lastSync:typeof x.lastSync==='string'?x.lastSync:null};
+    }catch(e){return null;}
+  }
+  function saveCloud(){
+    try{
+      if(!cloud){localStorage.removeItem(CLOUD_KEY);return;}
+      const minimal={roomId:String(cloud.roomId),secret:String(cloud.secret),revision:Math.max(0,Number(cloud.revision)||0),lastSync:cloud.lastSync||null};
+      localStorage.setItem(CLOUD_KEY,JSON.stringify(minimal));
+    }catch(e){}
+  }
   function active(){ return app.profiles.find(p=>p.id===app.activeProfileId)||app.profiles[0]; }
 
   function effectiveTheme(){
@@ -306,20 +321,48 @@
   }
   function pairCode(){ return cloud?`RTNW-CLOUD-${cloud.roomId}.${cloud.secret}`:''; }
   function parsePairCode(code){ const c=norm(code);const m=c.match(/^RTNW-CLOUD-([a-z0-9-]{8,64})\.([A-Za-z0-9_-]{32,128})$/i);if(!m)throw new Error('That pairing code is not valid.');return{roomId:m[1],secret:m[2],revision:0}; }
-  async function cloudRequest(body){ const r=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});let j={};try{j=await r.json()}catch(e){}if(!r.ok){const err=new Error(j.error||`Cloud sync error (${r.status})`);err.status=r.status;err.payload=j;throw err;}return j; }
+  async function cloudRequest(body){ const r=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store',credentials:'same-origin'});let j={};try{j=await r.json()}catch(e){}if(!r.ok){let message=j.error||`Cloud sync error (${r.status})`;if(r.status===429){const retry=Number(r.headers.get('retry-after')||0);message=retry?`Cloud sync is rate-limited. Try again in about ${Math.max(1,Math.ceil(retry/60))} minute(s).`:'Cloud sync is temporarily rate-limited. Try again shortly.';}const err=new Error(message);err.status=r.status;err.payload=j;throw err;}return j; }
   function renderCloudUI(){ const pill=$('cloud-status-pill'),txt=$('cloud-status-text');if(!cloudConfigured){pill.textContent='Setup needed';pill.className='status-pill';txt.textContent='Cloud-sync code is built in, but this deployment still needs its database connection. Local/offline tracking is fully active.';setText('cloud-mini','Local save');}
     else if(!cloud){pill.textContent='Ready';pill.className='status-pill good';txt.textContent='Cloud service is ready. Create a private pairing code on this device, then join with that code on your PC or phone.';setText('cloud-mini','Cloud ready');}
+    else if(cloudAuthInvalid){pill.textContent='Re-pair needed';pill.className='status-pill bad';txt.textContent='This device’s cloud pairing code is no longer valid. Disconnect this device, then join again with the current pairing code.';setText('cloud-mini','Re-pair needed');}
     else{pill.textContent='Connected';pill.className='status-pill good';txt.textContent=`Paired as ${cloud.roomId}. Changes sync automatically while online.`;setText('cloud-mini','Cloud connected');}
-    ['cloud-create','cloud-join'].forEach(id=>$(id).disabled=!cloudConfigured||!!cloud);['cloud-sync-now','cloud-copy-code','cloud-disconnect'].forEach(id=>$(id).disabled=!cloudConfigured||!cloud);
+    ['cloud-create','cloud-join'].forEach(id=>$(id).disabled=!cloudConfigured||!!cloud);['cloud-sync-now','cloud-copy-code','cloud-disconnect','cloud-rotate','cloud-revoke'].forEach(id=>{if($(id))$(id).disabled=!cloudConfigured||!cloud});
   }
-  async function cloudCreate(){ if(!cloudConfigured)return;cloud={roomId:`realm-${cryptoRandom(6)}`,secret:base64UrlEncode(cryptoRandom(32)),revision:0};saveCloud();try{await cloudPush(true);await copyText(pairCode());toast('Cloud pairing created. Pairing code copied.','good');renderCloudUI();startCloudPolling();}catch(e){cloud=null;saveCloud();renderCloudUI();toast(e.message,'bad')} }
-  async function cloudJoin(){ if(!cloudConfigured)return;const code=prompt('Paste the RTNW cloud pairing code from your other device:');if(code===null)return;let incoming;try{incoming=parsePairCode(code)}catch(e){toast(e.message,'bad');return;}createSnapshot('Before joining cloud sync');const previous=cloud;cloud=incoming;saveCloud();try{await cloudPull(true);toast('This device is now paired for automatic sync.','good');renderCloudUI();startCloudPolling();}catch(e){cloud=previous;saveCloud();renderCloudUI();toast(e.status===404?'That cloud pairing does not exist yet. Create it on the first device first.':e.message,'bad')} }
-  function cloudDisconnect(){ if(!cloud)return;if(!confirm('Disconnect cloud sync on this device? Your local tracker data will stay here.'))return;cloud=null;saveCloud();clearInterval(cloudPollTimer);cloudPollTimer=null;renderCloudUI();toast('Cloud sync disconnected on this device.'); }
+  async function cloudCreate(){
+    if(!cloudConfigured)return;
+    try{
+      const j=await cloudRequest({action:'create',state:deepClone(app)});
+      if(!j?.roomId||!j?.secret)throw new Error('Cloud pairing could not be created.');
+      cloud={roomId:j.roomId,secret:j.secret,revision:Number(j.revision)||1,lastSync:nowISO()};
+      cloudAuthInvalid=false;saveCloud();dirtySinceCloud=false;await copyText(pairCode());toast('Cloud pairing created. Pairing code copied.','good');renderCloudUI();startCloudPolling();
+    }catch(e){cloud=null;saveCloud();renderCloudUI();toast(e.message,'bad')}
+  }
+  async function cloudJoin(){ if(!cloudConfigured)return;const code=prompt('Paste the RTNW cloud pairing code from your other device:');if(code===null)return;let incoming;try{incoming=parsePairCode(code)}catch(e){toast(e.message,'bad');return;}createSnapshot('Before joining cloud sync');const previous=cloud;cloud=incoming;saveCloud();try{await cloudPull(true);cloudAuthInvalid=false;toast('This device is now paired for automatic sync.','good');renderCloudUI();startCloudPolling();}catch(e){cloud=previous;saveCloud();renderCloudUI();toast(e.status===401?'That pairing code could not be authenticated.':e.message,'bad')} }
+  function cloudDisconnect(){ if(!cloud)return;if(!confirm('Disconnect cloud sync on this device? Your local tracker data will stay here.'))return;cloud=null;cloudAuthInvalid=false;saveCloud();clearInterval(cloudPollTimer);cloudPollTimer=null;renderCloudUI();toast('Cloud sync disconnected on this device.'); }
+  async function cloudRotate(){
+    if(!cloudConfigured||!cloud)return;
+    if(!confirm('Rotate the cloud pairing code? The old code will stop working immediately and every other device will need to join again with the new code.'))return;
+    try{
+      const j=await cloudRequest({action:'rotate',roomId:cloud.roomId,secret:cloud.secret});
+      if(!j?.secret)throw new Error('The pairing code could not be rotated.');
+      cloud.secret=j.secret;cloud.revision=Number(j.revision)||cloud.revision||0;cloud.lastSync=nowISO();cloudAuthInvalid=false;saveCloud();
+      try{await copyText(pairCode());toast('Pairing code rotated. The new code was copied. Re-pair your other devices.','good')}catch(_){prompt('Copy your new pairing code:',pairCode())}
+      renderCloudUI();
+    }catch(e){toast(e.status===401?'The current pairing code could not be authenticated.':e.message,'bad')}
+  }
+  async function cloudRevoke(){
+    if(!cloudConfigured||!cloud)return;
+    if(!confirm('Revoke this cloud pairing for every device? The cloud copy will be deleted. Your tracker data on this device will stay saved locally.'))return;
+    try{
+      await cloudRequest({action:'revoke',roomId:cloud.roomId,secret:cloud.secret});
+      cloud=null;cloudAuthInvalid=false;saveCloud();clearInterval(cloudPollTimer);cloudPollTimer=null;dirtySinceCloud=false;renderCloudUI();setText('save-status','Saved locally');toast('Cloud pairing revoked for all devices. Local data was kept.','good');
+    }catch(e){toast(e.status===401?'The current pairing code could not be authenticated.':e.message,'bad')}
+  }
   function scheduleCloudPush(){ if(!cloudConfigured||!cloud||!navigator.onLine)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>cloudPush(false).catch(()=>{}),900); }
-  async function cloudPush(force=false){ if(!cloudConfigured||!cloud||!navigator.onLine)return;const payload=deepClone(app);try{const j=await cloudRequest({action:'push',roomId:cloud.roomId,secret:cloud.secret,baseRevision:force?undefined:(cloud.revision||0),state:payload});cloud.revision=j.revision||cloud.revision;cloud.lastSync=nowISO();saveCloud();dirtySinceCloud=false;setText('save-status','Cloud synced · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}));renderCloudUI();}
-    catch(e){if(e.status===409&&e.payload?.state){const server=normalizeApp(e.payload.state),serverTime=Date.parse(server.meta?.updatedAt||0),localTime=Date.parse(app.meta?.updatedAt||0);cloud.revision=e.payload.revision||cloud.revision;saveCloud();if(serverTime>=localTime){app=server;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));}catch(_){}dirtySinceCloud=false;renderAll();toast('Cloud changes were merged from your other device.');}else{return cloudPush(true);}}else{setText('save-status','Saved locally · cloud waiting');throw e;}}
+  async function cloudPush(force=false){ if(!cloudConfigured||!cloud||!navigator.onLine)return;const payload=deepClone(app);try{const j=await cloudRequest({action:'push',roomId:cloud.roomId,secret:cloud.secret,baseRevision:force?undefined:(cloud.revision||0),state:payload});cloudAuthInvalid=false;cloud.revision=j.revision||cloud.revision;cloud.lastSync=nowISO();saveCloud();dirtySinceCloud=false;setText('save-status','Cloud synced · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}));renderCloudUI();}
+    catch(e){if(e.status===409&&e.payload?.state){const server=normalizeApp(e.payload.state),serverTime=Date.parse(server.meta?.updatedAt||0),localTime=Date.parse(app.meta?.updatedAt||0);cloud.revision=e.payload.revision||cloud.revision;saveCloud();if(serverTime>=localTime){app=server;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));}catch(_){}dirtySinceCloud=false;renderAll();toast('Cloud changes were merged from your other device.');}else{return cloudPush(true);}}else{if(e.status===401){cloudAuthInvalid=true;renderCloudUI();setText('save-status','Saved locally · cloud re-pair needed');}else setText('save-status','Saved locally · cloud waiting');throw e;}}
   }
-  async function cloudPull(force=false){ if(!cloudConfigured||!cloud||!navigator.onLine)return;const j=await cloudRequest({action:'pull',roomId:cloud.roomId,secret:cloud.secret});if(!j.state)return;const server=normalizeApp(j.state),revision=j.revision||0;if(force||revision>(cloud.revision||0)){const serverTime=Date.parse(server.meta?.updatedAt||0),localTime=Date.parse(app.meta?.updatedAt||0);if(!dirtySinceCloud||force||serverTime>=localTime){app=server;cloud.revision=revision;cloud.lastSync=nowISO();saveCloud();try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));}catch(_){}dirtySinceCloud=false;renderAll();}else{cloud.revision=revision;saveCloud();await cloudPush(true);}} }
+  async function cloudPull(force=false){ if(!cloudConfigured||!cloud||!navigator.onLine)return;let j;try{j=await cloudRequest({action:'pull',roomId:cloud.roomId,secret:cloud.secret});cloudAuthInvalid=false;}catch(e){if(e.status===401){cloudAuthInvalid=true;renderCloudUI();setText('save-status','Saved locally · cloud re-pair needed');}throw e;}if(!j.state)return;const server=normalizeApp(j.state),revision=j.revision||0;if(force||revision>(cloud.revision||0)){const serverTime=Date.parse(server.meta?.updatedAt||0),localTime=Date.parse(app.meta?.updatedAt||0);if(!dirtySinceCloud||force||serverTime>=localTime){app=server;cloud.revision=revision;cloud.lastSync=nowISO();saveCloud();try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));}catch(_){}dirtySinceCloud=false;renderAll();}else{cloud.revision=revision;saveCloud();await cloudPush(true);}} }
   function startCloudPolling(){ if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>{if(document.visibilityState==='visible')cloudPull(false).catch(()=>{})},CLOUD_POLL_MS); }
 
   async function enableReminders(enabled){ if(enabled){if(!('Notification'in window)){toast('Notifications are not supported by this browser.','bad');return false;}let p=Notification.permission;if(p==='default')p=await Notification.requestPermission();if(p!=='granted'){toast('Notification permission was not granted.','bad');return false;}app.settings.reminders=true;}else app.settings.reminders=false;saveLocal('Reminder settings changed');renderSettings();return true; }
@@ -352,6 +395,7 @@
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
+    $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
     const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
