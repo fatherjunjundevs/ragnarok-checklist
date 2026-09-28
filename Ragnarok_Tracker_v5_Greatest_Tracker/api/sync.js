@@ -88,6 +88,7 @@ function validateProfile(profile) {
   if (!isObject(profile)) return false;
   if (!isString(profile.id, 1, 128) || !isString(profile.name, 1, 40)) return false;
   if (!isString(profile.className, 0, 40) || !isString(profile.avatar, 1, 32)) return false;
+  if ('accent' in profile && !['gold','teal','violet','rose','emerald','sky'].includes(profile.accent)) return false;
   if (!isDateKey(profile.dailyDate) || !isDateKey(profile.weekDate) || !isIsoDate(profile.updatedAt)) return false;
   if (!Array.isArray(profile.daily) || !Array.isArray(profile.weekly)) return false;
   if (profile.daily.length > MAX_TASKS_PER_KIND || profile.weekly.length > MAX_TASKS_PER_KIND) return false;
