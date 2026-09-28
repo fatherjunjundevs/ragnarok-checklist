@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.1.4
+# Ragnarok: The New World Tracker v5.2.0
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -51,6 +51,23 @@ Support is completely optional and does not unlock or restrict tracker functiona
 
 This is an unofficial fan-made community project and is not affiliated with or endorsed by the game publisher or developer.
 
+## Privacy & Security
+
+v5.2 adds a security-hardening layer around the tracker and optional cloud sync:
+
+- Database-backed rate limiting for sync traffic, room creation, credential rotation/revocation, and failed authentication attempts.
+- Server-generated high-entropy room IDs and pairing secrets for new cloud pairings.
+- Generic cloud authentication failures so an attacker cannot distinguish a missing room from a wrong secret.
+- Pairing-code rotation and full cloud revocation.
+- Strict server-side validation of tracker state before it is stored.
+- Content Security Policy (CSP), clickjacking protection, HSTS, strict referrer policy, and additional security headers.
+- Supabase RLS with no public policies for tracker and rate-limit tables.
+- A public `/privacy.html` page describing what is stored locally and in cloud sync.
+
+The cloud pairing code should be treated like a password. If it may have been exposed, use **Rotate pairing code**. To invalidate the cloud room for every device and delete its cloud copy, use **Revoke pairing everywhere**. Local tracker data on the current device remains available.
+
+The pairing credential is stored separately in browser localStorage so automatic sync can continue across browser restarts. It is not included in exported tracker JSON backups. CSP and other browser protections reduce the risk of same-origin script injection, but no client-side storage mechanism can make a secret inaccessible to malicious code that is already running with full same-origin privileges.
+
 ## Cloud sync setup (one-time)
 
 The front-end and API are already included. To turn cloud sync from “Setup needed” to “Ready”:
@@ -75,10 +92,12 @@ Files that must be present:
 - `index.html`
 - `assets/app.css`
 - `assets/app.js`
+- `assets/theme-init.js`
 - `assets/prontera.webp`
 - `assets/prontera.mp3`
 - `api/health.js`
 - `api/sync.js`
+- `privacy.html`
 - `icon-192.png`
 - `icon-512.png`
 - `manifest.webmanifest`
@@ -102,6 +121,15 @@ The app attempts autoplay when the user preference is enabled. Browsers may bloc
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.2.0 — Security hardening
+
+- Added durable Supabase-backed API rate limiting and abuse controls.
+- Added pairing-code rotation and all-device revocation.
+- Added strict cloud-state validation and generic authentication errors.
+- Added CSP, HSTS, clickjacking protection, and additional security headers.
+- Added `/privacy.html` with storage, cloud-sync, pairing-code, and payment-link disclosures.
+- Minimized and validates the locally persisted cloud credential object.
 
 ### v5.1.4 — FatherJunJun Branding + Support
 
