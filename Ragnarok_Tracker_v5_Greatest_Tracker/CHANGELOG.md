@@ -1,3 +1,14 @@
+# v5.4.1 — Smooth Organize Drag Patch
+
+- Rebuilt Organize-mode dragging around a lightweight drop slot instead of moving the full quest row on every pointer event.
+- Removed the duplicate-looking translucent source row while dragging; the original quest is hidden and its destination is shown as a clear dashed drop slot.
+- Moved the floating quest card with GPU-friendly `translate3d()` updates scheduled through `requestAnimationFrame` for smoother pointer tracking.
+- Simplified the floating card so it shows the quest identity without duplicated Favorite/Edit/counter controls.
+- Added gentle FLIP-style movement for neighboring quest rows as the drop slot changes position.
+- Added smoother edge auto-scroll and clearer category highlighting while moving quests between categories.
+- Preserved v5.4 counters, planner, guidance, cloud validation, and all earlier security/reset/music fixes.
+- Bumped front-end assets, API health, and service-worker cache to v5.4.1.
+
 # v5.4.0 — Everyday Questing Upgrade
 
 - Compacted the hero/header so checklist content appears sooner on desktop and mobile.
