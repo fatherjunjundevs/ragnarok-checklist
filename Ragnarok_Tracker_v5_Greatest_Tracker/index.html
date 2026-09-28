@@ -4,8 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta id="theme-color-meta" name="theme-color" content="#10274b">
-  <meta name="description" content="Ragnarok: The New World daily and weekly quest tracker with multi-character support, history, reminders, offline mode, and optional cloud sync.">
-  <title>Ragnarok: The New World Tracker</title>
+  <meta name="description" content="Fan-made Ragnarok: The New World daily and weekly tracker created by FatherJunJun, with multi-character tracking, reset timers, history, reminders, backups, and optional cloud sync.">
+  <meta name="author" content="FatherJunJun">
+  <meta property="og:title" content="Ragnarok: The New World Tracker | FatherJunJun">
+  <meta property="og:description" content="Free fan-made daily and weekly Ragnarok tracker by FatherJunJun with multi-character tracking, reset timers, history, reminders, backups, and cloud sync.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ragnarok-checklist.vercel.app/">
+  <link rel="canonical" href="https://ragnarok-checklist.vercel.app/">
+  <title>Ragnarok: The New World Tracker | FatherJunJun</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
@@ -21,7 +27,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.1.3">
+  <link rel="stylesheet" href="/assets/app.css?v=5.1.4">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -52,12 +58,16 @@
           <span class="eyebrow">Adventure tracker</span>
           <h1>Ragnarok:<br><span>The New World</span></h1>
           <p>Daily quests, weeklies, characters, history, notes, priorities, reminders, offline play, and cloud-ready sync.</p>
+          <div class="creator-credit" aria-label="Creator credit">
+            <span>Created by</span><strong>FatherJunJun</strong><small>Unofficial fan-made community tracker</small>
+          </div>
         </div>
         <div class="hero-actions">
           <button class="ghost" id="install-app" type="button" hidden>＋ Install App</button>
           <button class="ghost" id="theme-toggle" type="button" aria-label="Switch color theme">☾ Dark mode</button>
           <button class="ghost" id="open-settings" type="button">⚙ Settings</button>
           <button class="ghost" id="open-history" type="button">▦ History</button>
+          <button class="ghost support-hero-btn" id="open-support" type="button">☕ Support</button>
         </div>
       </div>
 
@@ -184,11 +194,37 @@
         </div>
         <p class="tiny">Browser notifications can be shown while the tracker is open. Background delivery depends on browser/PWA support.</p>
       </article>
+
+      <article class="utility-card support-card" id="support-card">
+        <div class="utility-title">
+          <div><span class="section-kicker">Made for the community</span><h3>☕ Support the Tracker</h3></div>
+          <span class="status-pill good">FatherJunJun</span>
+        </div>
+        <div class="support-card-grid">
+          <div>
+            <h4>About the Creator</h4>
+            <p>Hi! I’m <strong>FatherJunJun</strong>, the creator of this fan-made Ragnarok: The New World tracker. I built it to make daily quests, weeklies, multiple characters, resets, notes, priorities, and progress easier to manage across devices.</p>
+            <p>I plan to keep improving the tracker with fixes, quality-of-life improvements, and useful features based on how players actually use it. Thanks for using the tracker and being part of the community. ⚔️</p>
+          </div>
+          <div class="support-cta">
+            <p>The tracker is free to use. If you enjoy it and want to support future updates and maintenance, you can buy FatherJunJun a coffee.</p>
+            <div class="utility-actions">
+              <a class="button-link primary" href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">☕ Buy FatherJunJun a Coffee</a>
+              <button id="support-card-qr" type="button">▣ Show Support QR</button>
+              <button id="share-tracker" type="button">↗ Share Tracker</button>
+            </div>
+            <p class="tiny">Support is completely optional. The tracker will remain free to use.</p>
+          </div>
+        </div>
+      </article>
     </section>
 
     <footer class="footer">
-      <span>Ragnarok Tracker v5.1.3</span>
+      <span><strong>Ragnarok: The New World Tracker · v5.1.4</strong></span>
+      <span>Created with ☕ by <strong>FatherJunJun</strong></span>
+      <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
+      <small>Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.</small>
       <span id="save-status">Saved locally</span>
     </footer>
   </main>
@@ -251,6 +287,11 @@
       <h4>Category management</h4>
       <div class="category-manager"><input id="new-category-name" maxlength="30" placeholder="New category"><button type="button" id="add-category">Add category</button></div>
       <div id="category-chips" class="category-chips"></div>
+      <h4>About</h4>
+      <div class="about-settings">
+        <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.1.4 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+        <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
+      </div>
       <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Done</button></div>
     </form>
   </dialog>
@@ -263,6 +304,26 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.1.3" defer></script>
+
+  <dialog id="support-dialog" class="modal support-modal">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Support FatherJunJun</span><h3>Buy Me a Coffee ☕</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted support-copy">Enjoying the tracker? Scan the QR code or use the button below to support FatherJunJun and future tracker updates.</p>
+      <div class="support-qr-wrap">
+        <img class="support-qr" src="/assets/fatherjunjun-support-qr.png" alt="QR code for FatherJunJun's Buy Me a Coffee page" width="590" height="593">
+        <strong>Scan with your phone camera</strong>
+        <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">buymeacoffee.com/FatherJunJun</a>
+      </div>
+      <p class="tiny support-note">Support is completely optional. The tracker remains free to use.</p>
+      <div class="modal-actions support-modal-actions">
+        <button type="button" id="copy-support-link">Copy Support Link</button>
+        <span class="spacer"></span>
+        <button type="button" data-dialog-close>Close</button>
+        <a class="button-link primary" href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">☕ Open Buy Me a Coffee</a>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/assets/app.js?v=5.1.4" defer></script>
 </body>
 </html>

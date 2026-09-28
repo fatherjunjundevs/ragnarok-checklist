@@ -1,3 +1,15 @@
+# v5.1.4
+
+- Added creator branding for FatherJunJun.
+- Added a full-width Support the Tracker / About the Creator section.
+- Added Buy Me a Coffee support at `buymeacoffee.com/FatherJunJun`.
+- Added the creator's support QR code in a dedicated support modal.
+- Added Copy Support Link and Share Tracker actions.
+- Added creator attribution and an unofficial fan-made project disclaimer to the footer.
+- Added creator/about controls inside Settings.
+- Updated page metadata, sharing metadata, and PWA description with FatherJunJun creator attribution.
+- Bumped app, API health, assets, and service-worker cache to v5.1.4.
+
 # v5.1.3
 
 - Added Elite to the Hunt daily category alongside MVP and Mini.

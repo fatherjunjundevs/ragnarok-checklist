@@ -1,7 +1,7 @@
-const CACHE = 'rtnw-tracker-v5.1.3';
+const CACHE = 'rtnw-tracker-v5.1.4';
 const CORE = [
-  '/', '/index.html', '/manifest.webmanifest', '/assets/app.css?v=5.1.3', '/assets/app.js?v=5.1.3',
-  '/assets/prontera.webp', '/assets/prontera.mp3', '/icon-192.png', '/icon-512.png'
+  '/', '/index.html', '/manifest.webmanifest', '/assets/app.css?v=5.1.4', '/assets/app.js?v=5.1.4',
+  '/assets/prontera.webp', '/assets/prontera.mp3', '/assets/fatherjunjun-support-qr.png', '/icon-192.png', '/icon-512.png'
 ];
 
 self.addEventListener('install', event => {

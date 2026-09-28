@@ -1,7 +1,7 @@
 {
-  "name": "Ragnarok: The New World Tracker",
+  "name": "Ragnarok: The New World Tracker | FatherJunJun",
   "short_name": "RTNW Tracker",
-  "description": "Daily and weekly Ragnarok quest tracker with characters, history, reminders, offline mode, and cloud-ready sync.",
+  "description": "Fan-made Ragnarok: The New World daily and weekly tracker by FatherJunJun, with multi-character tracking, reset timers, history, reminders, backups, offline mode, and optional cloud sync.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -10,11 +10,41 @@
   "theme_color": "#10274b",
   "orientation": "any",
   "icons": [
-    {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ],
   "shortcuts": [
-    {"name":"Daily quests","short_name":"Dailies","url":"/#daily-card","icons":[{"src":"/icon-192.png","sizes":"192x192"}]},
-    {"name":"Weekly quests","short_name":"Weeklies","url":"/#weekly-card","icons":[{"src":"/icon-192.png","sizes":"192x192"}]}
+    {
+      "name": "Daily quests",
+      "short_name": "Dailies",
+      "url": "/#daily-card",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Weekly quests",
+      "short_name": "Weeklies",
+      "url": "/#weekly-card",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
