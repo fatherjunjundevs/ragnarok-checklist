@@ -246,22 +246,48 @@ html{scroll-behavior:smooth}body{padding:28px 18px 54px;background:radial-gradie
   try {
     const theme=byId('theme-audio'), musicButton=byId('music-toggle'), volume=byId('music-volume'), musicFile=byId('music-file'), musicName=byId('music-name'), welcome=byId('welcome'), main=document.querySelector('main'), embeddedSource=theme.getAttribute('src');
     let fileUrl=null, trackName='Theme of Prontera', attempt=0, audioFailed=false;
+    let audioCtx=null, mediaSource=null, gainNode=null;
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
     function buttonState(){ musicButton.textContent=theme.paused?'♫ Play music':'❚❚ Pause music'; musicButton.setAttribute('aria-pressed',String(!theme.paused)); }
     function closeWelcome(returnFocus){ welcome.hidden=true; main.inert=false; if(returnFocus)musicButton.focus(); }
     function showWelcome(){ byId('welcome-track').textContent=trackName+' is ready. Tap to start the music.'; welcome.hidden=false; main.inert=true; byId('enter-play').focus(); }
     function stopMusic(){ attempt++; theme.pause(); buttonState(); }
-    async function playMusic(){ const current=++attempt; try{ await theme.play(); if(current!==attempt)return; audioFailed=false; closeWelcome(false); buttonState(); musicName.textContent=trackName+' · playing'; }catch(error){ if(current!==attempt)return; buttonState(); if(error.name==='NotAllowedError')showWelcome(); else{audioFailed=true;closeWelcome(false);musicName.textContent='This audio could not play. Choose another audio file or restore Prontera.';} } }
-    function setVolume(){ try{ theme.volume=Math.max(0,Math.min(1,Number(volume.value)/100)); }catch(e){} }
-    setVolume(); byId('enter-play').addEventListener('click',playMusic); byId('enter-quiet').addEventListener('click',()=>{stopMusic();closeWelcome(true);});
+    function volumeLevel(){ return Math.max(0,Math.min(1,Number(volume.value)/100)); }
+    function applyVolume(){
+      const level=volumeLevel();
+      if(gainNode&&audioCtx){
+        try{ gainNode.gain.cancelScheduledValues(audioCtx.currentTime); gainNode.gain.setTargetAtTime(level,audioCtx.currentTime,.015); return; }catch(e){}
+      }
+      try{ theme.volume=level; }catch(e){}
+    }
+    async function ensureAudioGraph(){
+      if(!AudioContextClass) return false;
+      try{
+        if(!audioCtx){
+          audioCtx=new AudioContextClass();
+          mediaSource=audioCtx.createMediaElementSource(theme);
+          gainNode=audioCtx.createGain();
+          mediaSource.connect(gainNode); gainNode.connect(audioCtx.destination);
+          try{ theme.volume=1; }catch(e){}
+          applyVolume();
+        }
+        if(audioCtx.state==='suspended') await audioCtx.resume();
+        applyVolume();
+        return true;
+      }catch(e){ return false; }
+    }
+    async function playMusic(){ const current=++attempt; try{ await ensureAudioGraph(); applyVolume(); await theme.play(); if(current!==attempt)return; audioFailed=false; closeWelcome(false); buttonState(); musicName.textContent=trackName+' · playing'; }catch(error){ if(current!==attempt)return; buttonState(); if(error.name==='NotAllowedError')showWelcome(); else{audioFailed=true;closeWelcome(false);musicName.textContent='This audio could not play. Choose another audio file or restore Prontera.';} } }
+    applyVolume(); byId('enter-play').addEventListener('click',playMusic); byId('enter-quiet').addEventListener('click',()=>{stopMusic();closeWelcome(true);});
     welcome.addEventListener('keydown',event=>{ if(event.key==='Escape'){stopMusic();closeWelcome(true);} if(event.key==='Tab'){const first=byId('enter-play'),last=byId('enter-quiet');if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}} });
-    musicButton.addEventListener('click',()=>{if(theme.paused)playMusic();else stopMusic();}); volume.addEventListener('input',setVolume); theme.addEventListener('play',buttonState); theme.addEventListener('pause',()=>{buttonState();if(!audioFailed)musicName.textContent=trackName+' · paused';});
+    musicButton.addEventListener('click',()=>{if(theme.paused)playMusic();else stopMusic();}); volume.addEventListener('input',applyVolume); theme.addEventListener('play',buttonState); theme.addEventListener('pause',()=>{buttonState();if(!audioFailed)musicName.textContent=trackName+' · paused';});
     theme.addEventListener('error',()=>{audioFailed=true;buttonState();closeWelcome(false);musicName.textContent='This audio could not play. Choose another audio file or restore Prontera.';});
     byId('choose-music').addEventListener('click',()=>musicFile.click()); musicFile.addEventListener('change',()=>{const file=musicFile.files&&musicFile.files[0];if(!file)return;stopMusic();if(fileUrl)URL.revokeObjectURL(fileUrl);audioFailed=false;fileUrl=URL.createObjectURL(file);trackName=file.name;theme.src=fileUrl;byId('restore-music').hidden=false;musicName.textContent=trackName+' · ready';musicFile.value='';playMusic();});
     byId('restore-music').addEventListener('click',()=>{stopMusic();if(fileUrl){URL.revokeObjectURL(fileUrl);fileUrl=null;}audioFailed=false;theme.src=embeddedSource;trackName='Theme of Prontera';byId('restore-music').hidden=true;musicName.textContent=trackName+' · ready';playMusic();});
     playMusic();
   } catch(error){ byId('music-name').textContent='Music is unavailable in this browser. The checklist is ready.'; byId('welcome').hidden=true; document.querySelector('main').inert=false; }
 })();
-</script>\n<script>
+</script>
+<script>
 (() => {
   'use strict';
   const installButton = document.getElementById('install-app');
