@@ -1,3 +1,9 @@
+# v5.1.3
+
+- Added Elite to the Hunt daily category alongside MVP and Mini.
+- Added a one-time migration so existing character profiles receive Elite without losing current quest progress.
+- Includes the v5.1.2 iOS drag text-selection fix.
+
 # v5.1.2
 
 - Fixed iOS Safari selecting/highlighting quest text while dragging to reorder.

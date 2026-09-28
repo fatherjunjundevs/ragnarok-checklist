@@ -88,3 +88,9 @@ Modal close controls are explicit non-submit buttons. This prevents required for
 ## v5.1.2 iOS drag fix
 
 Quest drag handles now suppress iOS text selection, touch callouts, and selection ranges while a reorder gesture is active. Normal page text remains selectable when not dragging.
+
+## v5.1.3 Hunt update
+
+- Added **Elite** to the default **Hunt** daily category alongside MVP and Mini.
+- Existing v5 profiles automatically receive Elite once when first opened on v5.1.3, without resetting completion state for other quests.
+- Includes the v5.1.2 iOS drag text-selection fix.
