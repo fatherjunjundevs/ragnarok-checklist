@@ -1,3 +1,10 @@
+# v5.1.2
+
+- Fixed iOS Safari selecting/highlighting quest text while dragging to reorder.
+- Suppressed iOS touch callouts and selection only during active drag operations.
+- Added selection cleanup during pointer movement without disabling normal page text selection.
+- Bumped service-worker and asset cache versions so iPhones receive the fix.
+
 # v5.1.1
 
 - Fixed Character dialog × and Cancel buttons being blocked by required-field validation.

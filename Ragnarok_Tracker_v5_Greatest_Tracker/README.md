@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.1
+# Ragnarok: The New World Tracker v5.1.2
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -83,3 +83,8 @@ The included reminder system can show browser/PWA notifications while the tracke
 ## v5.1.1 modal fix
 
 Modal close controls are explicit non-submit buttons. This prevents required form fields (such as a blank character name) from blocking the × and Cancel controls. Escape/Cancel events also close the dialog explicitly.
+
+
+## v5.1.2 iOS drag fix
+
+Quest drag handles now suppress iOS text selection, touch callouts, and selection ranges while a reorder gesture is active. Normal page text remains selectable when not dragging.
