@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.2.0
+# Ragnarok: The New World Tracker v5.2.1
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -114,13 +114,21 @@ Files that must be present:
 
 ## Audio behavior
 
-The app attempts autoplay when the user preference is enabled. Browsers may block audible autoplay. If blocked, the first pointer/keyboard interaction attempts to unlock and start the music automatically. Volume uses a Web Audio gain node when available, with normal media-element volume as fallback.
+v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can satisfy Safari/iPhone/PWA media rules more reliably. On the first music-enabled visit, the tracker shows a **Welcome, adventurer** choice with **Enter with Music** or **Enter Quietly**. On later visits it can try autoplay when enabled; if the browser blocks it, the tracker shows a visible **Tap to enable music** control and also retries on the next eligible pointer/keyboard interaction. Quest UI confirmation sounds remain separate.
 
 ## Reminder limitation
 
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.2.1 — Music & convenience fixes
+
+- Fixed first-interaction music startup and activated the Welcome music-choice flow.
+- Added a visible fallback when autoplay is blocked.
+- Added iPhone/iPad Add to Home Screen guidance.
+- Kept Favorite visible on mobile.
+- Replaced Cloud Join's browser prompt with a proper pairing modal.
 
 ### v5.2.0 — Security hardening
 
