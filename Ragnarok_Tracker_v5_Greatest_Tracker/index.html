@@ -3,25 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta id="theme-color-meta" name="theme-color" content="#10274b">
+  <meta name="theme-color" content="#10274b">
   <meta name="description" content="Ragnarok: The New World daily and weekly quest tracker with multi-character support, history, reminders, offline mode, and optional cloud sync.">
   <title>Ragnarok: The New World Tracker</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script>
-    (() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem('rtnw-tracker-v5') || 'null');
-        const pref = saved?.settings?.theme || 'system';
-        const wantsDark = pref === 'dark' || (pref === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
-        document.documentElement.dataset.theme = wantsDark ? 'dark' : 'light';
-      } catch (_) {
-        document.documentElement.dataset.theme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    })();
-  </script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.1.0">
+  <link rel="stylesheet" href="/assets/app.css?v=5.0.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -55,7 +43,6 @@
         </div>
         <div class="hero-actions">
           <button class="ghost" id="install-app" type="button" hidden>＋ Install App</button>
-          <button class="ghost" id="theme-toggle" type="button" aria-label="Switch color theme">☾ Dark mode</button>
           <button class="ghost" id="open-settings" type="button">⚙ Settings</button>
           <button class="ghost" id="open-history" type="button">▦ History</button>
         </div>
@@ -187,7 +174,7 @@
     </section>
 
     <footer class="footer">
-      <span>Ragnarok Tracker v5.1</span>
+      <span>Ragnarok Tracker v5.0</span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
       <span id="save-status">Saved locally</span>
     </footer>
@@ -244,7 +231,6 @@
         <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
         <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Fit more quests on screen.</small></span></label>
         <label class="setting-tile"><input id="setting-ui-sounds" type="checkbox"><span><b>Quest UI sounds</b><small>Small confirmation tones for quest actions.</small></span></label>
-        <label class="setting-tile theme-setting"><span class="setting-icon" aria-hidden="true">◐</span><span><b>Appearance</b><small>Choose a light parchment theme, dark midnight theme, or follow this device.</small><select id="setting-theme" aria-label="Color theme"><option value="system">Device setting</option><option value="light">Light mode</option><option value="dark">Dark mode</option></select></span></label>
         <label class="setting-tile"><input id="setting-autoplay" type="checkbox"><span><b>Try music autoplay</b><small>Attempt Prontera music on load when the browser allows it.</small></span></label>
         <label class="setting-tile"><input id="setting-finish-auto" type="checkbox"><span><b>Suggest finish mode near reset</b><small>Highlight unfinished priorities in the final 2 hours.</small></span></label>
       </div>
@@ -263,6 +249,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.1.0" defer></script>
+  <script src="/assets/app.js?v=5.0.0" defer></script>
 </body>
 </html>
