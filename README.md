@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.2.1
+# Ragnarok: The New World Tracker v5.3.0
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -20,6 +20,8 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 14. Favorites and priority levels (Normal, Low, High, Urgent).
 15. Finish Before Reset mode that hides completed quests and prioritizes favorites/urgent work.
 16. Appearance control with Light, Dark, and Device themes, plus a one-click theme switch in the header.
+17. RPG-style category icons, richer progress/status cards, and per-character accent colors.
+18. Mobile bottom navigation and a lightweight completion celebration for faster, more satisfying everyday use.
 
 ## Appearance
 
@@ -121,6 +123,17 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.3.0 — Adventure UI upgrade
+
+- Added RPG category icons and category-level completion counters.
+- Added richer server/reset/connection status cards and reset urgency styling.
+- Added percentage progress badges, enhanced progress bars, and completion styling.
+- Added per-character accent colors.
+- Added a lightweight completion celebration.
+- Simplified Cloud Sync and Backups controls with expandable advanced/security sections.
+- Reorganized Settings and added direct shortcuts to cloud, backups, and reminders.
+- Added a mobile bottom navigation for faster one-handed use.
 
 ### v5.2.1 — Music & convenience fixes
 
