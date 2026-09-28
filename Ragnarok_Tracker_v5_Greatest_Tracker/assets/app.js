@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.3.0';
+  const VERSION = '5.4.0';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -27,6 +27,7 @@
   const CATEGORY_ICONS = {General:'📜',Guild:'🛡️',PvP:'⚔️',Hunt:'👑',Instance:'🏰',Farming:'🌾',Exploration:'🗺️',Social:'🤝',Pets:'🐾',Event:'🎉'};
   const CHARACTER_ACCENTS = {gold:'#e7bd6d',teal:'#5cb6aa',violet:'#a98ac8',rose:'#d67f9a',emerald:'#63b88b',sky:'#6fa8dc'};
   const CHARACTER_ACCENT_NAMES = Object.keys(CHARACTER_ACCENTS);
+  const SESSION_MINUTES = [15,30,45,60,90,120];
 
   const $ = id => document.getElementById(id);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -74,9 +75,24 @@
     return map[cleanName(name).toLowerCase()] || 'General';
   }
   function makeTask(name, category='General', extra={}){
-    return {id: extra.id || uid('q'), name: cleanName(name), done: extra.done===true, note: norm(extra.note).slice(0,500), favorite: extra.favorite===true,
-      priority: clamp(Number(extra.priority)||0,0,3), category: norm(extra.category || category).slice(0,30) || 'General', updatedAt: extra.updatedAt || nowISO(), completedAt: extra.done ? (extra.completedAt || nowISO()) : null};
+    const target=clamp(Math.round(Number(extra.target)||1),1,99);
+    const hasProgress=extra.progress!==undefined&&extra.progress!==null&&Number.isFinite(Number(extra.progress));
+    let progress=hasProgress?Math.round(Number(extra.progress)):(extra.done===true?target:0);
+    progress=clamp(progress,0,target);
+    let done=progress>=target;
+    if(!hasProgress&&extra.done===true){progress=target;done=true;}
+    const durationMin=clamp(Math.round(Number(extra.durationMin)||10),1,240);
+    return {id: extra.id || uid('q'), name: cleanName(name), done, note: norm(extra.note).slice(0,500), favorite: extra.favorite===true,
+      priority: clamp(Number(extra.priority)||0,0,3), category: norm(extra.category || category).slice(0,30) || 'General',
+      target,progress,durationMin,prerequisites:norm(extra.prerequisites).slice(0,200),location:norm(extra.location).slice(0,200),rewards:norm(extra.rewards).slice(0,200),
+      updatedAt: extra.updatedAt || nowISO(), completedAt: done ? (extra.completedAt || nowISO()) : null};
   }
+  function setTaskProgress(task,value){
+    const wasDone=!!task.done;task.progress=clamp(Math.round(Number(value)||0),0,task.target||1);task.done=task.progress>=(task.target||1);
+    if(task.done&&!wasDone)task.completedAt=nowISO();else if(!task.done)task.completedAt=null;touch(task);return {wasDone,done:task.done};
+  }
+  function toggleTaskComplete(task){return setTaskProgress(task,task.done?0:(task.target||1));}
+  function taskHasGuidance(task){return !!(task.prerequisites||task.location||task.rewards||task.note);}
   function defaultTasks(kind){ return (kind==='daily'?DEFAULT_DAILY:DEFAULT_WEEKLY).map(([n,c],i)=>makeTask(n,c,{id:`${kind}-${i}`})); }
   function normalizeTask(row, kind){
     if(!row || typeof row !== 'object') return null; const name=cleanName(row.name); if(!name) return null;
@@ -102,7 +118,7 @@
     }
     profile.daily.splice(at+1,0,elite);
   }
-  function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2}; }
+  function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2,sessionMinutes:15}; }
   function normalizeApp(input){
     const raw = input && typeof input==='object' ? input : {};
     let profiles;
@@ -111,10 +127,11 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
+    settings.sessionMinutes=SESSION_MINUTES.includes(Number(settings.sessionMinutes))?Number(settings.sessionMinutes):15;
     settings.collapsedSections={daily:false,weekly:false,...(raw.settings?.collapsedSections||{})};
     settings.collapsedCategories={daily:{},weekly:{},...(raw.settings?.collapsedCategories||{})};
     settings.collapsedCategories.daily={...(raw.settings?.collapsedCategories?.daily||{})};
@@ -142,6 +159,8 @@
   let customMusicUrl=null, audioUnlockArmed=false, audioUnlockHandler=null;
   let sfxCtx=null;
   let celebrationTimer=null;
+  let organizeMode=false;
+  let mobileSection='daily-card';
   const theme=$('theme-audio');
 
   function loadApp(){
@@ -215,8 +234,8 @@
   }
   function rolloverProfile(profile, now=new Date()){
     const d=dayKey(now),w=weekKey(now); let changed=false;
-    if(profile.dailyDate!==d){ if(profile.dailyDate)recordPeriod(profile,'daily',profile.dailyDate); profile.daily.forEach(t=>{t.done=false;t.completedAt=null}); profile.dailyDate=d; changed=true; }
-    if(profile.weekDate!==w){ if(profile.weekDate)recordPeriod(profile,'weekly',profile.weekDate); profile.weekly.forEach(t=>{t.done=false;t.completedAt=null}); profile.weekDate=w; changed=true; }
+    if(profile.dailyDate!==d){ if(profile.dailyDate)recordPeriod(profile,'daily',profile.dailyDate); profile.daily.forEach(t=>{t.done=false;t.progress=0;t.completedAt=null}); profile.dailyDate=d; changed=true; }
+    if(profile.weekDate!==w){ if(profile.weekDate)recordPeriod(profile,'weekly',profile.weekDate); profile.weekly.forEach(t=>{t.done=false;t.progress=0;t.completedAt=null}); profile.weekDate=w; changed=true; }
     if(changed)touch(profile); return changed;
   }
   function rolloverAll(){ let c=false; app.profiles.forEach(p=>{if(rolloverProfile(p))c=true}); if(c){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));}catch(e){}} return c; }
@@ -230,17 +249,44 @@
     else if(app.settings.completedBottom) tasks.sort((a,b)=>(Number(a.done)-Number(b.done))||(profile[kind].indexOf(a)-profile[kind].indexOf(b)));
     return tasks;
   }
-  function canDrag(){ return !app.settings.finishMode && !app.settings.hideCompleted && !app.settings.completedBottom; }
-  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); }
+  function canDrag(){ return organizeMode && !app.settings.finishMode && !app.settings.hideCompleted && !app.settings.completedBottom; }
+  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
     app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.style.setProperty('--tab-accent',accentColor(p.accent)); b.innerHTML=`<span class="character-avatar">${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
     const p=active(); const quick=$('quick-character-select'); quick.replaceChildren(); app.profiles.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=`${x.avatar} ${x.name}`;quick.append(o)});quick.value=p.id;
   }
+  function renderAllCharacters(){
+    const root=$('all-character-list');if(!root)return;root.replaceChildren();
+    app.profiles.forEach(profile=>{
+      const dd=profile.daily.filter(t=>t.done).length,wd=profile.weekly.filter(t=>t.done).length,remaining=(profile.daily.length-dd)+(profile.weekly.length-wd);
+      const btn=document.createElement('button');btn.type='button';btn.className='character-overview-row'+(profile.id===app.activeProfileId?' active':'');btn.style.setProperty('--row-accent',accentColor(profile.accent));
+      const dailyPct=profile.daily.length?Math.round(dd/profile.daily.length*100):0,weeklyPct=profile.weekly.length?Math.round(wd/profile.weekly.length*100):0;
+      btn.innerHTML=`<span class="overview-avatar">${escapeHTML(profile.avatar)}</span><span class="overview-main"><strong>${escapeHTML(profile.name)}</strong>${profile.className?`<small>${escapeHTML(profile.className)}</small>`:''}<span class="overview-bars"><i style="--p:${dailyPct}%"></i><i class="weekly" style="--p:${weeklyPct}%"></i></span></span><span class="overview-counts"><b>${dd}/${profile.daily.length}</b><small>Dailies</small><b>${wd}/${profile.weekly.length}</b><small>Weeklies</small><em>${remaining?`${remaining} left`:'All done ✓'}</em></span>`;
+      btn.addEventListener('click',()=>{if(profile.id===app.activeProfileId)return;app.activeProfileId=profile.id;saveLocal('Character switched');renderAll();requestAnimationFrame(()=>$('daily-card')?.scrollIntoView({behavior:'smooth',block:'start'}))});root.append(btn);
+    });
+  }
+  function plannerCandidates(){
+    const p=active(),resetMs=nextDailyReset(new Date())-new Date(),urgentReset=resetMs<=2*3600000;
+    return [...p.daily.map(task=>({task,kind:'daily'})),...p.weekly.map(task=>({task,kind:'weekly'}))].filter(x=>!x.task.done).map(x=>{
+      const t=x.task,duration=clamp(Number(t.durationMin)||10,1,240);let score=(t.priority||0)*100+(t.favorite?65:0)+(x.kind==='daily'?15:0)+(urgentReset&&x.kind==='daily'?120:0)-Math.min(duration,90)*.35;
+      return {...x,duration,score};
+    }).sort((a,b)=>b.score-a.score||a.duration-b.duration||a.task.name.localeCompare(b.task.name));
+  }
+  function renderSessionPlanner(){
+    const root=$('session-plan-list'),select=$('session-minutes');if(!root||!select)return;
+    const minutes=SESSION_MINUTES.includes(Number(app.settings.sessionMinutes))?Number(app.settings.sessionMinutes):15;select.value=String(minutes);root.replaceChildren();
+    let remaining=minutes,total=0;const picked=[],candidates=plannerCandidates();
+    for(const item of candidates){if(item.duration<=remaining){picked.push(item);remaining-=item.duration;total+=item.duration}}
+    setText('session-plan-summary',picked.length?`${total} min planned`:`${minutes} min available`);
+    if(!picked.length){const empty=document.createElement('div');empty.className='empty-state compact-empty';const shortest=[...candidates].sort((a,b)=>a.duration-b.duration)[0];empty.textContent=shortest?`No unfinished quest fits in ${minutes} minutes. Shortest estimate: ${shortest.duration} minutes.`:'No unfinished quests. Your checklist is clear!';root.append(empty);return;}
+    picked.forEach(({task,kind,duration})=>{const row=document.createElement('button');row.type='button';row.className='session-plan-item';row.innerHTML=`<span>${kind==='daily'?'☀️':'✦'}</span><span><strong>${escapeHTML(task.name)}</strong><small>${kind==='daily'?'Daily':'Weekly'}${task.priority>=2?` · ${priorityLabel(task.priority)}`:''}${task.favorite?' · ★ Favorite':''}</small></span><b>~${duration}m</b>`;row.addEventListener('click',()=>{app.settings.collapsedSections[kind]=false;app.settings.collapsedCategories[kind][task.category]=false;renderKind(kind);const target=$(`${kind}-card`);target?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{const quest=document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);quest?.classList.add('planner-highlight');quest?.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>quest?.classList.remove('planner-highlight'),1500)},350)});root.append(row)});
+  }
+
   function renderQuick(){
     const p=active(), dd=p.daily.filter(t=>t.done).length, wd=p.weekly.filter(t=>t.done).length;
     setText('quick-daily',`${dd}/${p.daily.length}`); setText('quick-weekly',`${wd}/${p.weekly.length}`);
-    setPressed('toggle-hide-completed',app.settings.hideCompleted); setPressed('toggle-finish-mode',app.settings.finishMode);
+    setPressed('toggle-hide-completed',app.settings.hideCompleted); setPressed('toggle-finish-mode',app.settings.finishMode); setPressed('toggle-organize',organizeMode);
   }
   function renderKind(kind){
     const p=active(); recordPeriod(p,kind,kind==='daily'?p.dailyDate:p.weekDate);
@@ -268,17 +314,44 @@
     tasks.forEach(t=>list.append(renderTask(kind,t))); block.append(list); return block;
   }
   function renderTask(kind,task){
-    const row=document.createElement('li'); row.className=`task-row${task.done?' done':''}${task.favorite?' favorite':''}${task.priority===2?' high':''}${task.priority===3?' urgent':''}`; row.dataset.taskId=task.id; row.dataset.kind=kind;
-    const dragBtn=document.createElement('button');dragBtn.type='button';dragBtn.className='drag-handle';dragBtn.textContent='⋮⋮';dragBtn.title=canDrag()?'Drag to reorder or change category':'Turn off filtering/sorting to drag';dragBtn.disabled=!canDrag();
-    dragBtn.addEventListener('pointerdown',e=>startDrag(e,kind,task.id));dragBtn.addEventListener('pointermove',dragMove);dragBtn.addEventListener('pointerup',endDrag);dragBtn.addEventListener('pointercancel',endDrag);dragBtn.addEventListener('keydown',e=>keyboardMove(e,kind,task.id)); row.append(dragBtn);
-    const check=document.createElement('label');check.className='task-check';const input=document.createElement('input');input.type='checkbox';input.checked=task.done;input.setAttribute('aria-label',`Mark ${task.name} ${task.done?'unfinished':'complete'}`);input.addEventListener('change',()=>{task.done=input.checked;task.completedAt=task.done?nowISO():null;touch(task);recordPeriod(active(),kind,kind==='daily'?active().dailyDate:active().weekDate);saveLocal('Quest progress');playSfx(task.done?'done':'undo');renderKind(kind);renderQuick();checkCompletion(kind)});check.append(input);row.append(check);
-    const copy=document.createElement('div');copy.className='task-copy';const name=document.createElement('div');name.className='task-name';name.textContent=task.name;copy.append(name);const meta=document.createElement('div');meta.className='task-meta';
-    if(task.note){const tag=document.createElement('span');tag.className='mini-tag note';tag.textContent='Note';meta.append(tag)}
+    const row=document.createElement('li');row.className=`task-row${task.done?' done':''}${task.favorite?' favorite':''}${task.priority===2?' high':''}${task.priority===3?' urgent':''}`;row.dataset.taskId=task.id;row.dataset.kind=kind;
+    const dragBtn=document.createElement('button');dragBtn.type='button';dragBtn.className='drag-handle organize-only';dragBtn.textContent='⋮⋮';dragBtn.title=canDrag()?'Pick up and drag this quest':'Enter Organize mode to move quests';dragBtn.disabled=!canDrag();
+    dragBtn.addEventListener('pointerdown',e=>startDrag(e,kind,task.id));dragBtn.addEventListener('pointermove',dragMove);dragBtn.addEventListener('pointerup',endDrag);dragBtn.addEventListener('pointercancel',endDrag);dragBtn.addEventListener('keydown',e=>keyboardMove(e,kind,task.id));row.append(dragBtn);
+
+    const check=document.createElement('label');check.className='task-check';const input=document.createElement('input');input.type='checkbox';input.checked=task.done;input.setAttribute('aria-label',`Mark ${task.name} ${task.done?'unfinished':'complete'}`);input.addEventListener('change',()=>commitTaskProgress(kind,task,input.checked?(task.target||1):0,'Quest progress'));check.append(input);row.append(check);
+
+    const copy=document.createElement('div');copy.className='task-copy';
+    const name=document.createElement('div');name.className='task-name task-name-hit';name.textContent=task.name;name.tabIndex=0;name.setAttribute('role','button');name.setAttribute('aria-label',`${task.done?'Mark unfinished':'Complete'} ${task.name}`);name.title=task.done?'Tap to mark unfinished':'Tap to complete';
+    const toggleFromName=()=>commitTaskProgress(kind,task,task.done?0:(task.target||1),'Quest progress');name.addEventListener('click',toggleFromName);name.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleFromName()}});copy.append(name);
+
+    const meta=document.createElement('div');meta.className='task-meta';
     if(task.priority>=2){const tag=document.createElement('span');tag.className=`mini-tag priority-${task.priority===3?'urgent':'high'}`;tag.textContent=priorityLabel(task.priority);meta.append(tag)}
     if(task.favorite){const tag=document.createElement('span');tag.className='mini-tag';tag.textContent='Favorite';meta.append(tag)}
-    if(meta.childNodes.length)copy.append(meta);row.append(copy);
-    const fav=document.createElement('button');fav.type='button';fav.className='favorite-btn';fav.textContent=task.favorite?'★':'☆';fav.setAttribute('aria-pressed',String(task.favorite));fav.title=task.favorite?'Remove favorite':'Favorite quest';fav.addEventListener('click',()=>{task.favorite=!task.favorite;touch(task);saveLocal('Favorite changed');renderKind(kind)});row.append(fav);
-    const edit=document.createElement('button');edit.type='button';edit.className='edit-task';edit.textContent=task.note?'Notes · Edit':'Edit';edit.addEventListener('click',()=>openTaskDialog(kind,task.id));row.append(edit);return row;
+    const timeTag=document.createElement('span');timeTag.className='mini-tag duration';timeTag.textContent=`~${task.durationMin||10} min`;meta.append(timeTag);
+    if(taskHasGuidance(task)){const tag=document.createElement('span');tag.className='mini-tag note';tag.textContent='Details';meta.append(tag)}
+    copy.append(meta);
+
+    if((task.target||1)>1){
+      const counter=document.createElement('div');counter.className='task-counter';counter.setAttribute('aria-label',`${task.name} progress`);
+      const minus=document.createElement('button');minus.type='button';minus.className='counter-btn';minus.textContent='−';minus.setAttribute('aria-label',`Decrease ${task.name} progress`);minus.disabled=(task.progress||0)<=0;minus.addEventListener('click',e=>{e.stopPropagation();commitTaskProgress(kind,task,(task.progress||0)-1,'Quest counter')});
+      const value=document.createElement('span');value.className='counter-value';value.textContent=`${task.progress||0} / ${task.target||1}`;
+      const plus=document.createElement('button');plus.type='button';plus.className='counter-btn';plus.textContent='＋';plus.setAttribute('aria-label',`Increase ${task.name} progress`);plus.disabled=(task.progress||0)>=(task.target||1);plus.addEventListener('click',e=>{e.stopPropagation();commitTaskProgress(kind,task,(task.progress||0)+1,'Quest counter')});
+      counter.append(minus,value,plus);copy.append(counter);
+    }
+
+    if(taskHasGuidance(task)){
+      const details=document.createElement('details');details.className='quest-details';const summary=document.createElement('summary');summary.textContent='Quest details';details.append(summary);
+      const grid=document.createElement('div');grid.className='quest-details-grid';
+      const addDetail=(label,value)=>{if(!value)return;const item=document.createElement('div');const b=document.createElement('strong');b.textContent=label;const span=document.createElement('span');span.textContent=value;item.append(b,span);grid.append(item)};
+      addDetail('Prerequisites',task.prerequisites);addDetail('Location',task.location);addDetail('Rewards',task.rewards);addDetail('Notes',task.note);details.append(grid);copy.append(details);
+    }
+    row.append(copy);
+
+    const fav=document.createElement('button');fav.type='button';fav.className='favorite-btn';fav.textContent=task.favorite?'★':'☆';fav.setAttribute('aria-pressed',String(task.favorite));fav.title=task.favorite?'Remove favorite':'Favorite quest';fav.addEventListener('click',()=>{task.favorite=!task.favorite;touch(task);saveLocal('Favorite changed');renderKind(kind);renderSessionPlanner()});row.append(fav);
+    const edit=document.createElement('button');edit.type='button';edit.className='edit-task organize-only';edit.textContent='Edit';edit.addEventListener('click',()=>openTaskDialog(kind,task.id));row.append(edit);return row;
+  }
+  function commitTaskProgress(kind,task,value,reason='Quest progress'){
+    const before=!!task.done;setTaskProgress(task,value);recordPeriod(active(),kind,kind==='daily'?active().dailyDate:active().weekDate);saveLocal(reason);playSfx(task.done&&!before?'done':before&&!task.done?'undo':'');renderKind(kind);renderQuick();renderAllCharacters();renderSessionPlanner();if(task.done&&!before)checkCompletion(kind);
   }
   function celebrateCompletion(kind){
     const p=active(),period=kind==='daily'?p.dailyDate:p.weekDate,key=`celebration:${p.id}:${kind}:${period}`;
@@ -293,25 +366,41 @@
   function setPressed(id,v){ const el=$(id);el?.setAttribute('aria-pressed',String(!!v)); }
 
   function clearTextSelection(){ try{ window.getSelection?.()?.removeAllRanges?.(); }catch(_){} }
-  function startDrag(e,kind,id){ if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();clearTextSelection();const row=e.currentTarget.closest('.task-row');drag={kind,id,row,handle:e.currentTarget,pointerId:e.pointerId};row.classList.add('dragging');document.body.classList.add('drag-active');e.currentTarget.setPointerCapture?.(e.pointerId); }
-  function dragMove(e){ if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();if(e.clientY<90)scrollBy(0,-14);else if(e.clientY>innerHeight-80)scrollBy(0,14);const el=document.elementFromPoint(e.clientX,e.clientY);const list=el?.closest('.task-list');if(!list||list.dataset.kind!==drag.kind||list.hidden)return;const over=el.closest('.task-row');if(over&&over!==drag.row){const r=over.getBoundingClientRect();list.insertBefore(drag.row,e.clientY<r.top+r.height/2?over:over.nextSibling);}else if(!over){list.append(drag.row);} }
-  function endDrag(e){ if(!drag||drag.pointerId!==e.pointerId)return;try{drag.handle.releasePointerCapture?.(e.pointerId)}catch(_){}const {kind,id}=drag;drag.row.classList.remove('dragging');document.body.classList.remove('drag-active');const p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set();const reordered=[];
-    $$(`.task-list[data-kind="${kind}"]`).forEach(list=>{ $$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})}); p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');drag=null;renderKind(kind);requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus()); }
-  function keyboardMove(e,kind,id){ if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveLocal('Quest order changed');renderKind(kind); }
+  function startDrag(e,kind,id){
+    if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();clearTextSelection();
+    const row=e.currentTarget.closest('.task-row'),rect=row.getBoundingClientRect(),ghost=row.cloneNode(true);
+    ghost.classList.remove('dragging-placeholder');ghost.classList.add('drag-floating');ghost.style.width=`${rect.width}px`;ghost.style.height=`${rect.height}px`;ghost.style.left=`${rect.left}px`;ghost.style.top=`${rect.top}px`;ghost.setAttribute('aria-hidden','true');ghost.querySelectorAll('button,input,summary').forEach(x=>{x.tabIndex=-1;if('disabled'in x)x.disabled=true});document.body.append(ghost);
+    drag={kind,id,row,ghost,handle:e.currentTarget,pointerId:e.pointerId,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top};row.classList.add('dragging-placeholder');document.body.classList.add('drag-active');try{e.currentTarget.setPointerCapture?.(e.pointerId)}catch(_){}moveDragGhost(e);
+  }
+  function moveDragGhost(e){if(!drag?.ghost)return;drag.ghost.style.left=`${Math.max(4,e.clientX-drag.offsetX)}px`;drag.ghost.style.top=`${Math.max(4,e.clientY-drag.offsetY)}px`;}
+  function dragMove(e){
+    if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();moveDragGhost(e);if(e.clientY<90)scrollBy(0,-14);else if(e.clientY>innerHeight-80)scrollBy(0,14);
+    const el=document.elementFromPoint(e.clientX,e.clientY),list=el?.closest('.task-list');if(!list||list.dataset.kind!==drag.kind||list.hidden)return;const over=el.closest('.task-row');if(over&&over!==drag.row&&!over.classList.contains('drag-floating')){const r=over.getBoundingClientRect();list.insertBefore(drag.row,e.clientY<r.top+r.height/2?over:over.nextSibling);}else if(!over){list.append(drag.row);}
+  }
+  function endDrag(e){
+    if(!drag||drag.pointerId!==e.pointerId)return;try{drag.handle.releasePointerCapture?.(e.pointerId)}catch(_){}const {kind,id}=drag;drag.ghost?.remove();drag.row.classList.remove('dragging-placeholder');document.body.classList.remove('drag-active');
+    const p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set(),reordered=[];$$(`.task-list[data-kind="${kind}"]`).forEach(list=>{$$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})});p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');drag=null;renderKind(kind);renderSessionPlanner();requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus());
+  }
+  function keyboardMove(e,kind,id){if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveLocal('Quest order changed');renderKind(kind);renderSessionPlanner();}
 
   function openTaskDialog(kind,id=null){
     const task=id?active()[kind].find(t=>t.id===id):null;$('task-id').value=task?.id||'';$('task-kind').value=kind;$('task-dialog-title').textContent=task?'Edit quest':`Add ${kind} quest`;$('task-dialog-kicker').textContent=kind==='daily'?'Daily quest':'Weekly quest';$('task-name').value=task?.name||'';$('task-note').value=task?.note||'';$('task-priority').value=String(task?.priority||0);$('task-favorite').checked=!!task?.favorite;$('task-delete').hidden=!task;
+    $('task-target').value=String(task?.target||1);$('task-progress').value=String(task?.progress||0);$('task-progress').max=String(task?.target||1);$('task-duration').value=String(task?.durationMin||10);$('task-prerequisites').value=task?.prerequisites||'';$('task-location').value=task?.location||'';$('task-rewards').value=task?.rewards||'';
     const select=$('task-category');select.replaceChildren();app.categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;select.append(o)});select.value=task?.category||'General';$('task-dialog').showModal();setTimeout(()=>$('task-name').focus(),40);
   }
-  function saveTaskFromDialog(){ const kind=$('task-kind').value,id=$('task-id').value,name=cleanName($('task-name').value);if(!name){toast('Enter a quest name.','bad');return false;}const p=active();let task=id?p[kind].find(t=>t.id===id):null;if(!task){task=makeTask(name,$('task-category').value);p[kind].push(task)}task.name=name;task.category=$('task-category').value;task.note=norm($('task-note').value).slice(0,500);task.priority=clamp(Number($('task-priority').value),0,3);task.favorite=$('task-favorite').checked;touch(task);saveLocal('Quest edited');renderKind(kind);return true; }
-  function deleteTaskFromDialog(){ const kind=$('task-kind').value,id=$('task-id').value;if(!id)return;if(!confirm('Delete this quest?'))return;createSnapshot('Before deleting quest');active()[kind]=active()[kind].filter(t=>t.id!==id);saveLocal('Quest deleted');$('task-dialog').close();renderKind(kind);renderQuick(); }
+  function saveTaskFromDialog(){
+    const kind=$('task-kind').value,id=$('task-id').value,name=cleanName($('task-name').value);if(!name){toast('Enter a quest name.','bad');return false;}const p=active();let task=id?p[kind].find(t=>t.id===id):null;if(!task){task=makeTask(name,$('task-category').value);p[kind].push(task)}
+    task.name=name;task.category=$('task-category').value;task.note=norm($('task-note').value).slice(0,500);task.priority=clamp(Number($('task-priority').value),0,3);task.favorite=$('task-favorite').checked;
+    task.target=clamp(Math.round(Number($('task-target').value)||1),1,99);task.progress=clamp(Math.round(Number($('task-progress').value)||0),0,task.target);task.durationMin=clamp(Math.round(Number($('task-duration').value)||10),1,240);task.prerequisites=norm($('task-prerequisites').value).slice(0,200);task.location=norm($('task-location').value).slice(0,200);task.rewards=norm($('task-rewards').value).slice(0,200);task.done=task.progress>=task.target;if(task.done&&!task.completedAt)task.completedAt=nowISO();if(!task.done)task.completedAt=null;touch(task);saveLocal('Quest edited');renderKind(kind);renderQuick();renderAllCharacters();renderSessionPlanner();return true;
+  }
+  function deleteTaskFromDialog(){ const kind=$('task-kind').value,id=$('task-id').value;if(!id)return;if(!confirm('Delete this quest?'))return;createSnapshot('Before deleting quest');active()[kind]=active()[kind].filter(t=>t.id!==id);saveLocal('Quest deleted');$('task-dialog').close();renderKind(kind);renderQuick();renderAllCharacters();renderSessionPlanner(); }
 
   function openCharacterDialog(id=null){ const p=id?app.profiles.find(x=>x.id===id):null;$('character-id').value=p?.id||'';$('character-dialog-title').textContent=p?'Edit character':'Add character';$('character-name').value=p?.name||'';$('character-class').value=p?.className||'';$('character-avatar').value=p?.avatar||'⚔️';$('character-accent').value=p?.accent||CHARACTER_ACCENT_NAMES[app.profiles.length%CHARACTER_ACCENT_NAMES.length]||'gold';$('character-copy-quests').checked=!p;$('character-copy-wrap').hidden=!!p;$('character-delete').hidden=!p||app.profiles.length===1;$('character-dialog').showModal();setTimeout(()=>$('character-name').focus(),40); }
-  function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40),accent=normalizeAccent($('character-accent').value);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;p.accent=accent;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
+  function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40),accent=normalizeAccent($('character-accent').value);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;p.accent=accent;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
   function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data?`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
-  function copySetup(){ if(app.profiles.length<2){toast('Add another character first.');return;}const targets=app.profiles.filter(p=>p.id!==app.activeProfileId);const msg=targets.map((p,i)=>`${i+1}. ${p.name}`).join('\n');const pick=prompt(`Copy quest setup FROM which character?\n\n${msg}`);if(pick===null)return;const src=targets[Number(pick)-1];if(!src){toast('That selection was not valid.','bad');return;}if(!confirm(`Replace ${active().name}'s quest setup with ${src.name}'s setup? Current completion checks will be cleared.`))return;createSnapshot('Before copying character setup');active().daily=src.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));active().weekly=src.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));saveLocal('Character quest setup copied');renderAll();toast(`Copied ${src.name}'s quest setup.`,'good'); }
+  function copySetup(){ if(app.profiles.length<2){toast('Add another character first.');return;}const targets=app.profiles.filter(p=>p.id!==app.activeProfileId);const msg=targets.map((p,i)=>`${i+1}. ${p.name}`).join('\n');const pick=prompt(`Copy quest setup FROM which character?\n\n${msg}`);if(pick===null)return;const src=targets[Number(pick)-1];if(!src){toast('That selection was not valid.','bad');return;}if(!confirm(`Replace ${active().name}'s quest setup with ${src.name}'s setup? Current completion checks will be cleared.`))return;createSnapshot('Before copying character setup');active().daily=src.daily.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null,updatedAt:nowISO()}));active().weekly=src.weekly.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null,updatedAt:nowISO()}));saveLocal('Character quest setup copied');renderAll();toast(`Copied ${src.name}'s quest setup.`,'good'); }
 
-  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
+  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);if($('session-minutes'))$('session-minutes').value=String(app.settings.sessionMinutes||15);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
   function renderCategoryChips(){ const root=$('category-chips');root.replaceChildren();app.categories.forEach(c=>{const chip=document.createElement('span');chip.className='category-chip';chip.append(document.createTextNode(c));if(c!=='General'){const b=document.createElement('button');b.type='button';b.textContent='×';b.title=`Delete ${c}`;b.addEventListener('click',()=>deleteCategory(c));chip.append(b)}root.append(chip)}); }
   function addCategory(){ const c=norm($('new-category-name').value).slice(0,30);if(!c)return;if(app.categories.some(x=>x.toLowerCase()===c.toLowerCase())){toast('That category already exists.');return;}app.categories.push(c);$('new-category-name').value='';saveLocal('Category added');renderCategoryChips(); }
   function deleteCategory(c){ const used=app.profiles.some(p=>[...p.daily,...p.weekly].some(t=>t.category===c));if(used&&!confirm(`Move quests in “${c}” to General and delete this category?`))return;app.profiles.forEach(p=>[...p.daily,...p.weekly].forEach(t=>{if(t.category===c)t.category='General'}));app.categories=app.categories.filter(x=>x!==c);saveLocal('Category deleted',{snapshot:true,snapshotReason:'Before category deletion'});renderAll(); }
@@ -427,14 +516,14 @@
   async function notifyReset(hoursLeft){ const p=active(),left=p.daily.filter(t=>!t.done).length;if(!left)return;const msg=`${left} daily quest${left===1?'':'s'} remaining. Reset is in about ${hoursLeft} hour${hoursLeft===1?'':'s'}.`;toast(msg);try{if(swRegistration?.showNotification)await swRegistration.showNotification('Ragnarok daily reset reminder',{body:msg,icon:'/icon-192.png',badge:'/icon-192.png',tag:`daily-${p.id}-${dayKey()}`});else if(Notification.permission==='granted')new Notification('Ragnarok daily reset reminder',{body:msg,icon:'/icon-192.png',tag:`daily-${p.id}-${dayKey()}`});}catch(e){} }
   function reminderTick(ms){ if(!app.settings.reminders)return;const threshold=(Number(app.settings.reminderHours)||2)*3600000;if(ms>threshold||ms<=0)return;let sent={};try{sent=JSON.parse(localStorage.getItem(REMINDER_KEY)||'{}')}catch(e){}const key=`${active().id}:${dayKey()}:${app.settings.reminderHours}`;if(sent[key])return;sent[key]=nowISO();try{localStorage.setItem(REMINDER_KEY,JSON.stringify(sent))}catch(e){}notifyReset(app.settings.reminderHours); }
 
-  function playSfx(type){ if(!app.settings.uiSounds)return;try{sfxCtx ||= new (window.AudioContext||window.webkitAudioContext)();const o=sfxCtx.createOscillator(),g=sfxCtx.createGain();o.frequency.value=type==='done'?880:520;g.gain.setValueAtTime(.035,sfxCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,sfxCtx.currentTime+.11);o.connect(g);g.connect(sfxCtx.destination);o.start();o.stop(sfxCtx.currentTime+.12);}catch(e){} }
+  function playSfx(type){ if(!app.settings.uiSounds||!['done','undo'].includes(type))return;try{sfxCtx ||= new (window.AudioContext||window.webkitAudioContext)();const o=sfxCtx.createOscillator(),g=sfxCtx.createGain();o.frequency.value=type==='done'?880:520;g.gain.setValueAtTime(.035,sfxCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,sfxCtx.currentTime+.11);o.connect(g);g.connect(sfxCtx.destination);o.start();o.stop(sfxCtx.currentTime+.12);}catch(e){} }
   function applyVolume(){const level=clamp(Number($('music-volume').value)/100,0,1);app.settings.musicVolume=Math.round(level*100);try{theme.volume=level}catch(e){}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}catch(e){} }
-  function musicButton(){ $('music-toggle').textContent=theme.paused?'♫ Play music':'❚❚ Pause music';$('music-toggle').setAttribute('aria-pressed',String(!theme.paused)); }
+  function musicButton(){ $('music-toggle').textContent=theme.paused?'♫ Play music':'❚❚ Pause music';$('music-toggle').setAttribute('aria-pressed',String(!theme.paused));setText('music-summary-state',theme.paused?'Paused':'Playing'); }
   function musicIntroSeen(){try{return localStorage.getItem(MUSIC_INTRO_KEY)==='1'}catch(e){return false}}
   function markMusicIntroSeen(){try{localStorage.setItem(MUSIC_INTRO_KEY,'1')}catch(e){}}
   function showMusicWelcome(){const w=$('welcome');if(!w)return;w.hidden=false;document.body.classList.add('welcome-open');requestAnimationFrame(()=>$('enter-play')?.focus())}
   function hideMusicWelcome(){const w=$('welcome');if(!w)return;w.hidden=true;document.body.classList.remove('welcome-open')}
-  function setMusicNeedsGesture(needs){const b=$('music-unlock');if(b)b.hidden=!needs;if(needs&&theme.paused)setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · tap to enable music`)}
+  function setMusicNeedsGesture(needs){const b=$('music-unlock');if(b)b.hidden=!needs;if(needs&&theme.paused){setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · tap to enable music`);setText('music-summary-state','Tap to enable')}}
   function disarmAudioUnlock(){if(!audioUnlockArmed)return;audioUnlockArmed=false;if(audioUnlockHandler){document.removeEventListener('pointerdown',audioUnlockHandler,true);document.removeEventListener('keydown',audioUnlockHandler,true);audioUnlockHandler=null}}
   function handleMusicStarted(){disarmAudioUnlock();setMusicNeedsGesture(false);musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · playing`)}
   function handleMusicBlocked(silentFailure=false){musicButton();setMusicNeedsGesture(true);armAudioUnlock();if(!silentFailure)toast('Tap “Enable music” or anywhere on the tracker to start the music.','bad')}
@@ -455,7 +544,7 @@
     document.addEventListener('pointerdown',audioUnlockHandler,true);
     document.addEventListener('keydown',audioUnlockHandler,true);
   }
-  function pauseMusic(){disarmAudioUnlock();theme.pause();setMusicNeedsGesture(false);musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · paused`)}
+  function pauseMusic(){disarmAudioUnlock();theme.pause();setMusicNeedsGesture(false);musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · paused`);setText('music-summary-state','Paused')}
   function initMusic(){
     theme.dataset.name='Theme of Prontera';$('music-volume').value=String(app.settings.musicVolume??35);applyVolume();musicButton();setMusicNeedsGesture(false);
     $('enter-play')?.addEventListener('click',()=>{
@@ -469,7 +558,7 @@
     $('choose-music').addEventListener('click',()=>$('music-file').click());
     $('music-file').addEventListener('change',()=>{const f=$('music-file').files?.[0];if(!f)return;pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=URL.createObjectURL(f);theme.src=customMusicUrl;theme.dataset.name=f.name;$('restore-music').hidden=false;$('music-file').value='';markMusicIntroSeen();const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})});
     $('restore-music').addEventListener('click',()=>{pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=null;theme.src='/assets/prontera.mp3';theme.dataset.name='Theme of Prontera';$('restore-music').hidden=true;markMusicIntroSeen();const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})});
-    theme.addEventListener('play',handleMusicStarted);theme.addEventListener('pause',musicButton);theme.addEventListener('error',()=>{disarmAudioUnlock();setMusicNeedsGesture(false);setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · could not load`);toast('The music file could not be loaded.','bad')});
+    theme.addEventListener('play',handleMusicStarted);theme.addEventListener('pause',musicButton);theme.addEventListener('error',()=>{disarmAudioUnlock();setMusicNeedsGesture(false);setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · could not load`);setText('music-summary-state','Could not load');toast('The music file could not be loaded.','bad')});
     if(app.settings.autoplay){
       if(!musicIntroSeen())showMusicWelcome();
       else{const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}
@@ -483,13 +572,14 @@
     document.addEventListener('contextmenu',e=>{ if(drag || e.target.closest?.('.drag-handle')) e.preventDefault(); });
     $$('[data-dialog-close]').forEach(btn=>btn.addEventListener('click',()=>{ const dialog=btn.closest('dialog'); if(dialog?.open) dialog.close('cancel'); }));
     $$('.modal').forEach(dialog=>dialog.addEventListener('cancel',e=>{ e.preventDefault(); dialog.close('cancel'); }));
-    $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted)app.settings.completedBottom=false;saveLocal('Filter changed');renderAll()});
-    $('toggle-finish-mode').addEventListener('click',()=>{app.settings.finishMode=!app.settings.finishMode;saveLocal('Finish mode changed');renderAll()});
+    $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted){app.settings.completedBottom=false;organizeMode=false}saveLocal('Filter changed');renderAll()});
+    $('toggle-finish-mode').addEventListener('click',()=>{app.settings.finishMode=!app.settings.finishMode;if(app.settings.finishMode)organizeMode=false;saveLocal('Finish mode changed');renderAll()});
+    $('toggle-organize').addEventListener('click',()=>{organizeMode=!organizeMode;if(organizeMode){const changed=app.settings.hideCompleted||app.settings.completedBottom||app.settings.finishMode;app.settings.hideCompleted=false;app.settings.completedBottom=false;app.settings.finishMode=false;if(changed)saveLocal('Organize mode prepared')}renderAll();toast(organizeMode?'Organize mode on — drag a quest card to move it.':'Organize mode off.','good')});
     $('quick-character-select').addEventListener('change',e=>{app.activeProfileId=e.target.value;saveLocal('Character switched');renderAll()});
     $$('[data-collapse]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.collapse;app.settings.collapsedSections[k]=!app.settings.collapsedSections[k];saveLocal('Section view changed');renderKind(k)}));
     $$('[data-add-task]').forEach(b=>b.addEventListener('click',()=>openTaskDialog(b.dataset.addTask)));
-    $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKind(k);renderQuick()}));
-    $('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
+    $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.progress=0;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKind(k);renderQuick();renderAllCharacters();renderSessionPlanner()}));
+    $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
@@ -497,14 +587,15 @@
     $('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
     $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
-    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
+    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked){app.settings.completedBottom=false;organizeMode=false}if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
     $('restore-snapshot').addEventListener('click',()=>{renderSnapshots();$('snapshot-dialog').showModal()});$('export-backup').addEventListener('click',exportBackup);$('import-backup').addEventListener('click',()=>$('backup-file').click());$('backup-file').addEventListener('change',()=>{const f=$('backup-file').files?.[0];if(f)importBackupFile(f);$('backup-file').value=''});
     $('copy-sync-code').addEventListener('click',async()=>{try{await copyText(manualCode());toast('Manual sync code copied.','good')}catch(e){prompt('Copy this sync code:',manualCode())}});$('import-sync-code').addEventListener('click',()=>{const c=prompt('Paste an RTNW5 manual sync code:');if(c===null)return;try{const incoming=importManualCode(c);if(!confirm('Replace this device\'s tracker data with the imported sync code?'))return;createSnapshot('Before manual sync import');app=incoming;localStorage.setItem(STORAGE_KEY,JSON.stringify(app));dirtySinceCloud=true;renderAll();scheduleCloudPush();toast('Manual sync imported.','good')}catch(e){toast(e.message,'bad')}});
     $('cloud-create').addEventListener('click',cloudCreate);$('cloud-join').addEventListener('click',openCloudJoinDialog);$('cloud-join-paste')?.addEventListener('click',pasteCloudJoinCode);$('cloud-join-submit')?.addEventListener('click',e=>{e.preventDefault();submitCloudJoin()});$('cloud-sync-now').addEventListener('click',async()=>{try{await cloudPull(false);await cloudPush(false);toast('Cloud sync complete.','good')}catch(e){toast(e.message,'bad')}});$('cloud-copy-code').addEventListener('click',async()=>{if(!cloud)return;try{await copyText(pairCode());toast('Pairing code copied.','good')}catch(e){prompt('Copy this pairing code:',pairCode())}});$('cloud-disconnect').addEventListener('click',cloudDisconnect);
-    $('reminders-enabled').addEventListener('change',async e=>{const ok=await enableReminders(e.target.checked);if(!ok)e.target.checked=false});$('reminder-hours').addEventListener('change',e=>{app.settings.reminderHours=Number(e.target.value)||2;saveLocal('Reminder timing changed');renderSettings()});
+    $('reminders-enabled').addEventListener('change',async e=>{const ok=await enableReminders(e.target.checked);if(!ok)e.target.checked=false});$('reminder-hours').addEventListener('change',e=>{app.settings.reminderHours=Number(e.target.value)||2;saveLocal('Reminder timing changed');renderSettings()});$('session-minutes')?.addEventListener('change',e=>{const value=Number(e.target.value);app.settings.sessionMinutes=SESSION_MINUTES.includes(value)?value:15;saveLocal('Session planner time changed');renderSessionPlanner()});
     window.addEventListener('online',()=>{setText('network-status','Online');checkCloudHealth()});window.addEventListener('offline',()=>{setText('network-status','Offline');setText('cloud-mini','Local/offline')});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloud)cloudPull(false).catch(()=>{})});
+    const mobileButtons=$$('[data-mobile-target]');const markMobile=id=>{mobileSection=id;mobileButtons.forEach(b=>b.classList.toggle('active',b.dataset.mobileTarget===id))};mobileButtons.forEach(b=>b.addEventListener('click',()=>markMobile(b.dataset.mobileTarget)));if('IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{const visible=entries.filter(x=>x.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(visible)markMobile(visible.target.id)},{rootMargin:'-20% 0px -55% 0px',threshold:[0,.25,.5]});['daily-card','weekly-card','character-dock'].forEach(id=>{const el=$(id);if(el)observer.observe(el)});}markMobile(mobileSection);
     window.addEventListener('storage',e=>{if(e.key===STORAGE_KEY&&e.newValue){try{const incoming=normalizeApp(JSON.parse(e.newValue));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}catch(_){}}});
     try{if(window.BroadcastChannel){const bc=new BroadcastChannel('rtnw-v5');bc.onmessage=()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const incoming=normalizeApp(JSON.parse(raw));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}}catch(_){}};}}catch(e){}
   }
