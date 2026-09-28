@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.2.0';
+  const VERSION = '5.2.1';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -11,6 +11,7 @@
   const CLOUD_ROOM_RE = /^[a-z0-9-]{8,64}$/i;
   const CLOUD_SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
   const REMINDER_KEY = 'rtnw-tracker-v5-reminders';
+  const MUSIC_INTRO_KEY = 'rtnw-tracker-v5-music-intro';
   const SERVER_OFFSET_MIN = 7 * 60;
   const RESET_HOUR = 5;
   const MAX_PROFILES = 50;
@@ -104,7 +105,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -132,7 +133,7 @@
   let reloadingForUpdate = false;
   let lastDay = dayKey(), lastWeek = weekKey();
   let drag = null;
-  let audioCtx=null, gainNode=null, mediaSource=null, customMusicUrl=null, audioUnlockArmed=false;
+  let customMusicUrl=null, audioUnlockArmed=false, audioUnlockHandler=null;
   let sfxCtx=null;
   const theme=$('theme-audio');
 
@@ -337,7 +338,37 @@
       cloudAuthInvalid=false;saveCloud();dirtySinceCloud=false;await copyText(pairCode());toast('Cloud pairing created. Pairing code copied.','good');renderCloudUI();startCloudPolling();
     }catch(e){cloud=null;saveCloud();renderCloudUI();toast(e.message,'bad')}
   }
-  async function cloudJoin(){ if(!cloudConfigured)return;const code=prompt('Paste the RTNW cloud pairing code from your other device:');if(code===null)return;let incoming;try{incoming=parsePairCode(code)}catch(e){toast(e.message,'bad');return;}createSnapshot('Before joining cloud sync');const previous=cloud;cloud=incoming;saveCloud();try{await cloudPull(true);cloudAuthInvalid=false;toast('This device is now paired for automatic sync.','good');renderCloudUI();startCloudPolling();}catch(e){cloud=previous;saveCloud();renderCloudUI();toast(e.status===401?'That pairing code could not be authenticated.':e.message,'bad')} }
+  function openCloudJoinDialog(){
+    if(!cloudConfigured||cloud)return;
+    const d=$('cloud-join-dialog');
+    $('cloud-join-code').value='';
+    if(d&&!d.open)d.showModal();
+    setTimeout(()=>$('cloud-join-code')?.focus(),40);
+  }
+  async function pasteCloudJoinCode(){
+    try{
+      if(!navigator.clipboard?.readText)throw new Error('Clipboard paste is not available in this browser.');
+      const code=await navigator.clipboard.readText();
+      if(!code)throw new Error('Your clipboard is empty.');
+      $('cloud-join-code').value=code.trim();
+      toast('Pairing code pasted.','good');
+    }catch(e){toast('Paste the pairing code into the box manually.','bad');$('cloud-join-code')?.focus();}
+  }
+  async function submitCloudJoin(){
+    if(!cloudConfigured||cloud)return;
+    const code=$('cloud-join-code').value;
+    let incoming;
+    try{incoming=parsePairCode(code)}catch(e){toast(e.message,'bad');$('cloud-join-code')?.focus();return;}
+    createSnapshot('Before joining cloud sync');
+    const previous=cloud;cloud=incoming;saveCloud();
+    const connect=$('cloud-join-submit'); if(connect)connect.disabled=true;
+    try{
+      await cloudPull(true);cloudAuthInvalid=false;
+      $('cloud-join-dialog')?.close('connected');
+      toast('This device is now paired for automatic sync.','good');renderCloudUI();startCloudPolling();
+    }catch(e){cloud=previous;saveCloud();renderCloudUI();toast(e.status===401?'That pairing code could not be authenticated.':e.message,'bad')}
+    finally{if(connect)connect.disabled=false;}
+  }
   function cloudDisconnect(){ if(!cloud)return;if(!confirm('Disconnect cloud sync on this device? Your local tracker data will stay here.'))return;cloud=null;cloudAuthInvalid=false;saveCloud();clearInterval(cloudPollTimer);cloudPollTimer=null;renderCloudUI();toast('Cloud sync disconnected on this device.'); }
   async function cloudRotate(){
     if(!cloudConfigured||!cloud)return;
@@ -370,13 +401,53 @@
   function reminderTick(ms){ if(!app.settings.reminders)return;const threshold=(Number(app.settings.reminderHours)||2)*3600000;if(ms>threshold||ms<=0)return;let sent={};try{sent=JSON.parse(localStorage.getItem(REMINDER_KEY)||'{}')}catch(e){}const key=`${active().id}:${dayKey()}:${app.settings.reminderHours}`;if(sent[key])return;sent[key]=nowISO();try{localStorage.setItem(REMINDER_KEY,JSON.stringify(sent))}catch(e){}notifyReset(app.settings.reminderHours); }
 
   function playSfx(type){ if(!app.settings.uiSounds)return;try{sfxCtx ||= new (window.AudioContext||window.webkitAudioContext)();const o=sfxCtx.createOscillator(),g=sfxCtx.createGain();o.frequency.value=type==='done'?880:520;g.gain.setValueAtTime(.035,sfxCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,sfxCtx.currentTime+.11);o.connect(g);g.connect(sfxCtx.destination);o.start();o.stop(sfxCtx.currentTime+.12);}catch(e){} }
-  async function ensureAudioGraph(){ const C=window.AudioContext||window.webkitAudioContext;if(!C)return false;try{if(!audioCtx){audioCtx=new C();mediaSource=audioCtx.createMediaElementSource(theme);gainNode=audioCtx.createGain();mediaSource.connect(gainNode);gainNode.connect(audioCtx.destination);theme.volume=1;}if(audioCtx.state==='suspended')await audioCtx.resume();applyVolume();return true}catch(e){return false} }
-  function applyVolume(){const level=clamp(Number($('music-volume').value)/100,0,1);app.settings.musicVolume=Math.round(level*100);if(gainNode&&audioCtx)gainNode.gain.setTargetAtTime(level,audioCtx.currentTime,.015);else{try{theme.volume=level}catch(e){}}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}catch(e){} }
+  function applyVolume(){const level=clamp(Number($('music-volume').value)/100,0,1);app.settings.musicVolume=Math.round(level*100);try{theme.volume=level}catch(e){}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}catch(e){} }
   function musicButton(){ $('music-toggle').textContent=theme.paused?'♫ Play music':'❚❚ Pause music';$('music-toggle').setAttribute('aria-pressed',String(!theme.paused)); }
-  async function playMusic(silentFailure=false){try{await ensureAudioGraph();applyVolume();await theme.play();musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · playing`);return true}catch(e){musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · tap anywhere to start`);if(!silentFailure)toast('Your browser needs a tap before it can start music.');armAudioUnlock();return false} }
-  function armAudioUnlock(){ if(audioUnlockArmed)return;audioUnlockArmed=true;const unlock=e=>{if(e?.target?.closest?.('.music-strip'))return;audioUnlockArmed=false;document.removeEventListener('pointerdown',unlock,true);document.removeEventListener('keydown',unlock,true);playMusic(true)};document.addEventListener('pointerdown',unlock,true);document.addEventListener('keydown',unlock,true); }
-  function pauseMusic(){theme.pause();musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · paused`)}
-  function initMusic(){theme.dataset.name='Theme of Prontera';$('music-volume').value=String(app.settings.musicVolume??35);applyVolume();musicButton();if(app.settings.autoplay)playMusic(true);$('music-toggle').addEventListener('click',()=>theme.paused?playMusic():pauseMusic());$('music-volume').addEventListener('input',applyVolume);$('choose-music').addEventListener('click',()=>$('music-file').click());$('music-file').addEventListener('change',()=>{const f=$('music-file').files?.[0];if(!f)return;pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=URL.createObjectURL(f);theme.src=customMusicUrl;theme.dataset.name=f.name;$('restore-music').hidden=false;$('music-file').value='';playMusic();});$('restore-music').addEventListener('click',()=>{pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=null;theme.src='/assets/prontera.mp3';theme.dataset.name='Theme of Prontera';$('restore-music').hidden=true;playMusic();});theme.addEventListener('play',musicButton);theme.addEventListener('pause',musicButton); }
+  function musicIntroSeen(){try{return localStorage.getItem(MUSIC_INTRO_KEY)==='1'}catch(e){return false}}
+  function markMusicIntroSeen(){try{localStorage.setItem(MUSIC_INTRO_KEY,'1')}catch(e){}}
+  function showMusicWelcome(){const w=$('welcome');if(!w)return;w.hidden=false;document.body.classList.add('welcome-open');requestAnimationFrame(()=>$('enter-play')?.focus())}
+  function hideMusicWelcome(){const w=$('welcome');if(!w)return;w.hidden=true;document.body.classList.remove('welcome-open')}
+  function setMusicNeedsGesture(needs){const b=$('music-unlock');if(b)b.hidden=!needs;if(needs&&theme.paused)setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · tap to enable music`)}
+  function disarmAudioUnlock(){if(!audioUnlockArmed)return;audioUnlockArmed=false;if(audioUnlockHandler){document.removeEventListener('pointerdown',audioUnlockHandler,true);document.removeEventListener('keydown',audioUnlockHandler,true);audioUnlockHandler=null}}
+  function handleMusicStarted(){disarmAudioUnlock();setMusicNeedsGesture(false);musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · playing`)}
+  function handleMusicBlocked(silentFailure=false){musicButton();setMusicNeedsGesture(true);armAudioUnlock();if(!silentFailure)toast('Tap “Enable music” or anywhere on the tracker to start the music.','bad')}
+  function playMusic(silentFailure=false){
+    applyVolume();
+    let result;
+    try{result=theme.play();}catch(e){handleMusicBlocked(silentFailure);return Promise.reject(e)}
+    return Promise.resolve(result).then(()=>{handleMusicStarted();return true}).catch(e=>{handleMusicBlocked(silentFailure);throw e});
+  }
+  function armAudioUnlock(){
+    if(audioUnlockArmed)return;
+    audioUnlockArmed=true;
+    audioUnlockHandler=e=>{
+      if(e.type==='keydown'&&['Shift','Control','Alt','Meta','Tab','Escape'].includes(e.key))return;
+      const attempt=playMusic(true);
+      Promise.resolve(attempt).catch(()=>{});
+    };
+    document.addEventListener('pointerdown',audioUnlockHandler,true);
+    document.addEventListener('keydown',audioUnlockHandler,true);
+  }
+  function pauseMusic(){disarmAudioUnlock();theme.pause();setMusicNeedsGesture(false);musicButton();setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · paused`)}
+  function initMusic(){
+    theme.dataset.name='Theme of Prontera';$('music-volume').value=String(app.settings.musicVolume??35);applyVolume();musicButton();setMusicNeedsGesture(false);
+    $('enter-play')?.addEventListener('click',()=>{
+      markMusicIntroSeen();hideMusicWelcome();app.settings.autoplay=true;
+      const attempt=playMusic(false);saveLocal('Music preference changed');renderSettings();Promise.resolve(attempt).catch(()=>{});
+    });
+    $('enter-quiet')?.addEventListener('click',()=>{markMusicIntroSeen();hideMusicWelcome();app.settings.autoplay=false;pauseMusic();saveLocal('Music preference changed');renderSettings();toast('Entered quietly. You can start music anytime.');});
+    $('music-unlock')?.addEventListener('click',()=>{markMusicIntroSeen();const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})});
+    $('music-toggle').addEventListener('click',()=>{markMusicIntroSeen();if(theme.paused){const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()});
+    $('music-volume').addEventListener('input',applyVolume);
+    $('choose-music').addEventListener('click',()=>$('music-file').click());
+    $('music-file').addEventListener('change',()=>{const f=$('music-file').files?.[0];if(!f)return;pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=URL.createObjectURL(f);theme.src=customMusicUrl;theme.dataset.name=f.name;$('restore-music').hidden=false;$('music-file').value='';markMusicIntroSeen();const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})});
+    $('restore-music').addEventListener('click',()=>{pauseMusic();if(customMusicUrl)URL.revokeObjectURL(customMusicUrl);customMusicUrl=null;theme.src='/assets/prontera.mp3';theme.dataset.name='Theme of Prontera';$('restore-music').hidden=true;markMusicIntroSeen();const attempt=playMusic(false);Promise.resolve(attempt).catch(()=>{})});
+    theme.addEventListener('play',handleMusicStarted);theme.addEventListener('pause',musicButton);theme.addEventListener('error',()=>{disarmAudioUnlock();setMusicNeedsGesture(false);setText('music-name',`${theme.dataset.name||'Theme of Prontera'} · could not load`);toast('The music file could not be loaded.','bad')});
+    if(app.settings.autoplay){
+      if(!musicIntroSeen())showMusicWelcome();
+      else{const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}
+    }
+  }
 
   function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
 
@@ -396,20 +467,32 @@
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
-    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;saveLocal('Settings changed');renderAll()}));
+    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
     $('restore-snapshot').addEventListener('click',()=>{renderSnapshots();$('snapshot-dialog').showModal()});$('export-backup').addEventListener('click',exportBackup);$('import-backup').addEventListener('click',()=>$('backup-file').click());$('backup-file').addEventListener('change',()=>{const f=$('backup-file').files?.[0];if(f)importBackupFile(f);$('backup-file').value=''});
     $('copy-sync-code').addEventListener('click',async()=>{try{await copyText(manualCode());toast('Manual sync code copied.','good')}catch(e){prompt('Copy this sync code:',manualCode())}});$('import-sync-code').addEventListener('click',()=>{const c=prompt('Paste an RTNW5 manual sync code:');if(c===null)return;try{const incoming=importManualCode(c);if(!confirm('Replace this device\'s tracker data with the imported sync code?'))return;createSnapshot('Before manual sync import');app=incoming;localStorage.setItem(STORAGE_KEY,JSON.stringify(app));dirtySinceCloud=true;renderAll();scheduleCloudPush();toast('Manual sync imported.','good')}catch(e){toast(e.message,'bad')}});
-    $('cloud-create').addEventListener('click',cloudCreate);$('cloud-join').addEventListener('click',cloudJoin);$('cloud-sync-now').addEventListener('click',async()=>{try{await cloudPull(false);await cloudPush(false);toast('Cloud sync complete.','good')}catch(e){toast(e.message,'bad')}});$('cloud-copy-code').addEventListener('click',async()=>{if(!cloud)return;try{await copyText(pairCode());toast('Pairing code copied.','good')}catch(e){prompt('Copy this pairing code:',pairCode())}});$('cloud-disconnect').addEventListener('click',cloudDisconnect);
+    $('cloud-create').addEventListener('click',cloudCreate);$('cloud-join').addEventListener('click',openCloudJoinDialog);$('cloud-join-paste')?.addEventListener('click',pasteCloudJoinCode);$('cloud-join-submit')?.addEventListener('click',e=>{e.preventDefault();submitCloudJoin()});$('cloud-sync-now').addEventListener('click',async()=>{try{await cloudPull(false);await cloudPush(false);toast('Cloud sync complete.','good')}catch(e){toast(e.message,'bad')}});$('cloud-copy-code').addEventListener('click',async()=>{if(!cloud)return;try{await copyText(pairCode());toast('Pairing code copied.','good')}catch(e){prompt('Copy this pairing code:',pairCode())}});$('cloud-disconnect').addEventListener('click',cloudDisconnect);
     $('reminders-enabled').addEventListener('change',async e=>{const ok=await enableReminders(e.target.checked);if(!ok)e.target.checked=false});$('reminder-hours').addEventListener('change',e=>{app.settings.reminderHours=Number(e.target.value)||2;saveLocal('Reminder timing changed');renderSettings()});
     window.addEventListener('online',()=>{setText('network-status','Online');checkCloudHealth()});window.addEventListener('offline',()=>{setText('network-status','Offline');setText('cloud-mini','Local/offline')});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloud)cloudPull(false).catch(()=>{})});
     window.addEventListener('storage',e=>{if(e.key===STORAGE_KEY&&e.newValue){try{const incoming=normalizeApp(JSON.parse(e.newValue));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}catch(_){}}});
     try{if(window.BroadcastChannel){const bc=new BroadcastChannel('rtnw-v5');bc.onmessage=()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const incoming=normalizeApp(JSON.parse(raw));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}}catch(_){}};}}catch(e){}
   }
 
-  async function initPWA(){ if(!('serviceWorker'in navigator))return;try{swRegistration=await navigator.serviceWorker.register('/sw.js');if(swRegistration.waiting)showUpdate();swRegistration.addEventListener('updatefound',()=>{const nw=swRegistration.installing;nw?.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)showUpdate()})});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloadingForUpdate)return;reloadingForUpdate=true;location.reload()});$('apply-update').addEventListener('click',()=>swRegistration?.waiting?.postMessage({type:'SKIP_WAITING'}));setInterval(()=>swRegistration?.update(),60*60*1000);}catch(e){}
-    let deferred=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('install-app').hidden=false});$('install-app').addEventListener('click',async()=>{if(deferred){deferred.prompt();await deferred.userChoice;deferred=null;$('install-app').hidden=true}else if(/iphone|ipad|ipod/i.test(navigator.userAgent)){toast('On iPhone: Safari Share → Add to Home Screen.')}});
+  function isIOSDevice(){return /iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
+  function isStandaloneDisplay(){return window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true}
+  async function initPWA(){
+    const installBtn=$('install-app');let deferred=null;const ios=isIOSDevice();
+    if(ios&&!isStandaloneDisplay()){installBtn.hidden=false;installBtn.textContent='＋ Add to Home Screen'}
+    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;if(!isStandaloneDisplay()){installBtn.hidden=false;installBtn.textContent='＋ Install App'}});
+    window.addEventListener('appinstalled',()=>{deferred=null;installBtn.hidden=true;toast('Tracker installed. Welcome to the adventure!','good')});
+    installBtn.addEventListener('click',async()=>{
+      if(ios&&!isStandaloneDisplay()){const d=$('install-dialog');if(d&&!d.open)d.showModal();return;}
+      if(deferred){deferred.prompt();await deferred.userChoice;deferred=null;installBtn.hidden=true;return;}
+      toast('Use your browser menu and choose Install App or Add to Home Screen.');
+    });
+    if(!('serviceWorker'in navigator))return;
+    try{swRegistration=await navigator.serviceWorker.register('/sw.js');if(swRegistration.waiting)showUpdate();swRegistration.addEventListener('updatefound',()=>{const nw=swRegistration.installing;nw?.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)showUpdate()})});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloadingForUpdate)return;reloadingForUpdate=true;location.reload()});$('apply-update').addEventListener('click',()=>swRegistration?.waiting?.postMessage({type:'SKIP_WAITING'}));setInterval(()=>swRegistration?.update(),60*60*1000);}catch(e){}
   }
   function showUpdate(){$('update-banner').hidden=false}
 
