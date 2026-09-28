@@ -66,3 +66,26 @@ html[data-theme="dark"] input[type="checkbox"],html[data-theme="dark"] input[typ
 html[data-theme="dark"] .setting-icon{background:#1d3850;color:#c9d7e4}
 html[data-theme="dark"] .theme-setting select{background:#0b1a2b;color:#e7eef6;border-color:#35516b}
 #theme-toggle{min-width:122px}
+
+
+/* v5.1.4 FatherJunJun creator branding + support */
+.creator-credit{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:13px;padding:7px 10px;border:1px solid #ffffff35;border-radius:999px;background:#061a358f;backdrop-filter:blur(6px);font-size:.72rem;color:#dbe7ef}
+.creator-credit span{color:#a9bdcc}.creator-credit strong{color:#f7e4b5;font-size:.78rem}.creator-credit small{color:#c9d8e3;border-left:1px solid #ffffff38;padding-left:7px}
+.support-hero-btn{border-color:#f0cf85!important;background:#806020aa!important;color:#fff7df!important}
+.support-card{grid-column:1/-1;background:linear-gradient(135deg,#fffdf8,#f8f1df)}
+.support-card-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:22px;align-items:start}
+.support-card h4{margin:7px 0 4px;color:#3d526a}.support-card strong{color:#314b68}.support-cta{border:1px solid #ead7ab;background:#fff9e9;border-radius:14px;padding:14px}
+.button-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font:inherit;cursor:pointer;border:1px solid #b9c4cf;border-radius:10px;background:#fff;color:var(--ink);padding:7px 9px;font-weight:760;font-size:.75rem;transition:.15s ease}
+.button-link:hover{transform:translateY(-1px);box-shadow:0 5px 14px #07152b22}
+.footer{align-items:center}.footer a{color:#e7c982;text-decoration:none;font-weight:760}.footer a:hover{text-decoration:underline}.footer small{flex-basis:100%;color:#8094a6;line-height:1.4}
+.footer-link{border:0;background:transparent;color:#e7c982;padding:0;font:inherit;font-weight:760;cursor:pointer}.footer-link:hover{text-decoration:underline}
+.about-settings{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafbfb;margin-top:8px}.about-settings>div:first-child{display:grid;gap:3px}.about-settings span{font-size:.74rem;color:#627386}.about-settings small{font-size:.68rem;color:#7a8896}.about-settings .utility-actions{margin-top:0;flex-shrink:0}
+.support-copy{text-align:center;max-width:520px;margin:0 auto 14px}.support-qr-wrap{display:grid;justify-items:center;gap:8px;text-align:center}.support-qr{width:min(330px,82vw);height:auto;max-width:100%;background:#fff;border:1px solid var(--line);border-radius:18px;padding:10px;box-shadow:0 12px 30px #00112722}.support-qr-wrap strong{font-size:.86rem}.support-qr-wrap a{font-size:.78rem;color:#226c85;font-weight:760;word-break:break-all}.support-note{text-align:center;margin-top:12px!important}.support-modal-actions{flex-wrap:wrap}.support-modal .button-link{font-size:.78rem;padding:9px 12px}
+html[data-theme="dark"] .support-card{background:linear-gradient(135deg,#142b43,#102239);border-color:#36526b}
+html[data-theme="dark"] .support-card h4,html[data-theme="dark"] .support-card strong{color:#edf4fb}
+html[data-theme="dark"] .support-cta{background:#182d42;border-color:#5b5136}
+html[data-theme="dark"] .button-link{background:#183049;color:#e9f1f8;border-color:#3a5871}
+html[data-theme="dark"] .about-settings{background:#11263c;border-color:#2c4760}html[data-theme="dark"] .about-settings span,html[data-theme="dark"] .about-settings small{color:#9fb0c1}
+html[data-theme="dark"] .support-qr-wrap a{color:#8ed4e5}.support-modal .support-qr{border-color:#35516b}
+@media(max-width:800px){.support-card-grid{grid-template-columns:1fr}.about-settings{align-items:flex-start;flex-direction:column}.about-settings .utility-actions{width:100%}}
+@media(max-width:520px){.creator-credit{border-radius:13px}.creator-credit small{width:100%;border-left:0;padding-left:0}.support-modal-actions{display:grid;grid-template-columns:1fr}.support-modal-actions .spacer{display:none}.support-modal-actions>*{width:100%}.support-qr{width:min(300px,86vw)}}

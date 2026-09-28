@@ -1,7 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.1.3';
+  const VERSION = '5.1.4';
+  const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
+  const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
@@ -100,7 +102,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(savedVersion!=='5.1.3') profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -289,6 +291,12 @@
   function manualCode(){return 'RTNW5-'+base64UrlEncode(JSON.stringify(app))}
   function importManualCode(code){const c=norm(code);if(!c.startsWith('RTNW5-'))throw new Error('This is not a valid RTNW5 sync code.');return normalizeApp(JSON.parse(base64UrlDecode(c.slice(6))));}
   async function copyText(text){ if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;}const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();document.execCommand('copy');ta.remove(); }
+  function openSupportDialog(){ const d=$('support-dialog'); if(d&&!d.open)d.showModal(); }
+  async function copySupportLink(){ try{await copyText(SUPPORT_URL);toast('Support link copied.','good')}catch(e){prompt('Copy this support link:',SUPPORT_URL)} }
+  async function shareTracker(){
+    const data={title:'Ragnarok: The New World Tracker | FatherJunJun',text:'Check out the Ragnarok: The New World Tracker by FatherJunJun — a free fan-made tool for managing daily quests, weeklies, multiple characters, reset timers, and progress.',url:TRACKER_URL};
+    try{if(navigator.share){await navigator.share(data);return;}await copyText(TRACKER_URL);toast('Tracker link copied.','good')}catch(e){if(e?.name!=='AbortError')toast('Could not share the tracker right now.','bad')}
+  }
   function exportBackup(){ const blob=new Blob([JSON.stringify(app,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ragnarok-tracker-backup-${dayKey()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported.','good'); }
   async function importBackupFile(file){ try{const incoming=normalizeApp(JSON.parse(await file.text()));if(!confirm('Replace this device\'s tracker data with the imported backup?'))return;createSnapshot('Before importing backup');app=incoming;localStorage.setItem(STORAGE_KEY,JSON.stringify(app));dirtySinceCloud=true;renderAll();scheduleCloudPush();toast('Backup imported.','good')}catch(e){toast('That backup file could not be read.','bad')} }
 
@@ -343,6 +351,7 @@
     $('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
+    ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
     const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
