@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.4.0';
+  const VERSION = '5.4.1';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -127,7 +127,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -366,20 +366,81 @@
   function setPressed(id,v){ const el=$(id);el?.setAttribute('aria-pressed',String(!!v)); }
 
   function clearTextSelection(){ try{ window.getSelection?.()?.removeAllRanges?.(); }catch(_){} }
+  function dragListAtPoint(x,y){
+    const stack=document.elementsFromPoint?.(x,y)||[];
+    for(const el of stack){
+      const list=el.closest?.('.task-list');
+      if(list&&list.dataset.kind===drag?.kind&&!list.hidden)return list;
+      const block=el.closest?.('.category-block');
+      const blockList=block?.querySelector?.(`.task-list[data-kind="${drag?.kind}"]`);
+      if(blockList&&!blockList.hidden)return blockList;
+    }
+    return null;
+  }
+  function clearDragTarget(){
+    drag?.targetList?.closest('.category-block')?.classList.remove('drag-drop-active');
+    if(drag)drag.targetList=null;
+  }
+  function captureDragRowPositions(lists){
+    const positions=new Map();lists.filter(Boolean).forEach(list=>$$('.task-row:not(.drag-source)',list).forEach(row=>positions.set(row,row.getBoundingClientRect().top)));return positions;
+  }
+  function animateDragReflow(before,lists){
+    if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    requestAnimationFrame(()=>lists.filter(Boolean).forEach(list=>$$('.task-row:not(.drag-source)',list).forEach(row=>{
+      const oldTop=before.get(row);if(oldTop===undefined)return;const dy=oldTop-row.getBoundingClientRect().top;if(Math.abs(dy)<1)return;
+      try{row.__dragReflowAnimation?.cancel?.();row.__dragReflowAnimation=row.animate([{transform:`translate3d(0,${dy}px,0)`},{transform:'translate3d(0,0,0)'}],{duration:135,easing:'cubic-bezier(.2,.8,.2,1)'});}catch(_){}
+    })));
+  }
+  function moveDropSlot(list,y){
+    if(!drag||!list)return;
+    if(drag.targetList!==list){clearDragTarget();drag.targetList=list;list.closest('.category-block')?.classList.add('drag-drop-active');}
+    const rows=$$('.task-row:not(.drag-source)',list);let before=null;
+    for(const row of rows){const r=row.getBoundingClientRect();if(y<r.top+r.height*.5){before=row;break;}}
+    const oldList=drag.slot.parentElement?.classList.contains('task-list')?drag.slot.parentElement:null;
+    const alreadyThere=before ? (oldList===list&&drag.slot.nextSibling===before) : (oldList===list&&drag.slot===list.lastElementChild);
+    if(alreadyThere)return;
+    const affected=[...new Set([oldList,list].filter(Boolean))],positions=captureDragRowPositions(affected);
+    if(before)list.insertBefore(drag.slot,before);else list.append(drag.slot);animateDragReflow(positions,affected);
+  }
+  function dragScrollSpeed(y){
+    const edge=Math.min(110,Math.max(72,innerHeight*.13));
+    if(y<edge)return -Math.ceil((edge-y)/edge*18);
+    if(y>innerHeight-edge)return Math.ceil((y-(innerHeight-edge))/edge*18);
+    return 0;
+  }
+  function runDragFrame(){
+    if(!drag)return;
+    drag.frame=0;
+    const x=drag.clientX,y=drag.clientY;
+    const maxX=Math.max(6,innerWidth-drag.ghostWidth-6),maxY=Math.max(6,innerHeight-drag.ghostHeight-6);
+    const gx=clamp(x-drag.offsetX,6,maxX),gy=clamp(y-drag.offsetY,6,maxY);
+    drag.ghost.style.transform=`translate3d(${Math.round(gx)}px,${Math.round(gy)}px,0) scale(1.025) rotate(.18deg)`;
+    const speed=dragScrollSpeed(y);
+    if(speed)scrollBy(0,speed);
+    const list=dragListAtPoint(x,y);if(list)moveDropSlot(list,y);
+    if(speed&&drag)drag.frame=requestAnimationFrame(runDragFrame);
+  }
+  function queueDragFrame(x,y){
+    if(!drag)return;drag.clientX=x;drag.clientY=y;if(!drag.frame)drag.frame=requestAnimationFrame(runDragFrame);
+  }
   function startDrag(e,kind,id){
     if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();clearTextSelection();
-    const row=e.currentTarget.closest('.task-row'),rect=row.getBoundingClientRect(),ghost=row.cloneNode(true);
-    ghost.classList.remove('dragging-placeholder');ghost.classList.add('drag-floating');ghost.style.width=`${rect.width}px`;ghost.style.height=`${rect.height}px`;ghost.style.left=`${rect.left}px`;ghost.style.top=`${rect.top}px`;ghost.setAttribute('aria-hidden','true');ghost.querySelectorAll('button,input,summary').forEach(x=>{x.tabIndex=-1;if('disabled'in x)x.disabled=true});document.body.append(ghost);
-    drag={kind,id,row,ghost,handle:e.currentTarget,pointerId:e.pointerId,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top};row.classList.add('dragging-placeholder');document.body.classList.add('drag-active');try{e.currentTarget.setPointerCapture?.(e.pointerId)}catch(_){}moveDragGhost(e);
+    const row=e.currentTarget.closest('.task-row'),rect=row.getBoundingClientRect();if(!row||!rect.width)return;
+    const slot=document.createElement('li');slot.className='drag-drop-slot';slot.style.height=`${Math.max(44,rect.height)}px`;slot.setAttribute('aria-hidden','true');row.after(slot);
+    const ghost=row.cloneNode(true);ghost.classList.remove('planner-highlight','drag-source');ghost.classList.add('drag-floating');ghost.style.width=`${rect.width}px`;ghost.style.height=`${rect.height}px`;ghost.setAttribute('aria-hidden','true');ghost.querySelectorAll('.favorite-btn,.edit-task,.task-counter,.quest-details').forEach(x=>x.remove());ghost.querySelectorAll('button,input,summary').forEach(x=>{x.tabIndex=-1;if('disabled'in x)x.disabled=true});document.body.append(ghost);
+    row.classList.add('drag-source');document.body.classList.add('drag-active');
+    drag={kind,id,row,slot,ghost,handle:e.currentTarget,pointerId:e.pointerId,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,ghostWidth:rect.width,ghostHeight:rect.height,clientX:e.clientX,clientY:e.clientY,frame:0,targetList:row.closest('.task-list')};
+    drag.targetList?.closest('.category-block')?.classList.add('drag-drop-active');
+    try{e.currentTarget.setPointerCapture?.(e.pointerId)}catch(_){}queueDragFrame(e.clientX,e.clientY);
   }
-  function moveDragGhost(e){if(!drag?.ghost)return;drag.ghost.style.left=`${Math.max(4,e.clientX-drag.offsetX)}px`;drag.ghost.style.top=`${Math.max(4,e.clientY-drag.offsetY)}px`;}
   function dragMove(e){
-    if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();moveDragGhost(e);if(e.clientY<90)scrollBy(0,-14);else if(e.clientY>innerHeight-80)scrollBy(0,14);
-    const el=document.elementFromPoint(e.clientX,e.clientY),list=el?.closest('.task-list');if(!list||list.dataset.kind!==drag.kind||list.hidden)return;const over=el.closest('.task-row');if(over&&over!==drag.row&&!over.classList.contains('drag-floating')){const r=over.getBoundingClientRect();list.insertBefore(drag.row,e.clientY<r.top+r.height/2?over:over.nextSibling);}else if(!over){list.append(drag.row);}
+    if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();queueDragFrame(e.clientX,e.clientY);
   }
   function endDrag(e){
-    if(!drag||drag.pointerId!==e.pointerId)return;try{drag.handle.releasePointerCapture?.(e.pointerId)}catch(_){}const {kind,id}=drag;drag.ghost?.remove();drag.row.classList.remove('dragging-placeholder');document.body.classList.remove('drag-active');
-    const p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set(),reordered=[];$$(`.task-list[data-kind="${kind}"]`).forEach(list=>{$$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})});p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');drag=null;renderKind(kind);renderSessionPlanner();requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus());
+    if(!drag||drag.pointerId!==e.pointerId)return;
+    const current=drag;drag=null;if(current.frame)cancelAnimationFrame(current.frame);try{current.handle.releasePointerCapture?.(e.pointerId)}catch(_){}
+    current.slot.parentNode?.insertBefore(current.row,current.slot);current.slot.remove();current.ghost?.remove();current.row.classList.remove('drag-source');current.targetList?.closest('.category-block')?.classList.remove('drag-drop-active');document.body.classList.remove('drag-active');
+    const {kind,id}=current,p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set(),reordered=[];$$(`.task-list[data-kind="${kind}"]`).forEach(list=>{$$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})});p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');renderKind(kind);renderSessionPlanner();requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus());
   }
   function keyboardMove(e,kind,id){if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveLocal('Quest order changed');renderKind(kind);renderSessionPlanner();}
 
