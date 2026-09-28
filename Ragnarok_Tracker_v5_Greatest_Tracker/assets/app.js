@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.0.0';
+  const VERSION = '5.1.0';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
@@ -80,7 +80,7 @@
     const weekly = (Array.isArray(p.weekly)?p.weekly:defaultTasks('weekly')).map(x=>normalizeTask(x,'weekly')).filter(Boolean);
     return {id: typeof p.id==='string'&&p.id?p.id:uid('char'), name:norm(p.name||fallback).slice(0,40)||fallback, className:norm(p.className||'').slice(0,40), avatar:norm(p.avatar||'⚔️').slice(0,4)||'⚔️', dailyDate:p.dailyDate||dayKey(), weekDate:p.weekDate||weekKey(), daily, weekly, updatedAt:p.updatedAt||nowISO()};
   }
-  function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2}; }
+  function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2}; }
   function normalizeApp(input){
     const raw = input && typeof input==='object' ? input : {};
     let profiles;
@@ -90,6 +90,7 @@
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
+    if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
     settings.collapsedSections={daily:false,weekly:false,...(raw.settings?.collapsedSections||{})};
     settings.collapsedCategories={daily:{},weekly:{},...(raw.settings?.collapsedCategories||{})};
     settings.collapsedCategories.daily={...(raw.settings?.collapsedCategories?.daily||{})};
@@ -125,6 +126,25 @@
   function loadCloud(){ try{ const x=JSON.parse(localStorage.getItem(CLOUD_KEY)||'null'); return x&&x.roomId&&x.secret?x:null; }catch(e){return null;} }
   function saveCloud(){ try{ cloud?localStorage.setItem(CLOUD_KEY,JSON.stringify(cloud)):localStorage.removeItem(CLOUD_KEY); }catch(e){} }
   function active(){ return app.profiles.find(p=>p.id===app.activeProfileId)||app.profiles[0]; }
+
+  function effectiveTheme(){
+    const pref=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';
+    if(pref==='dark') return 'dark';
+    if(pref==='light') return 'light';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function applyTheme(){
+    const eff=effectiveTheme();
+    document.documentElement.dataset.theme=eff;
+    document.documentElement.dataset.themePreference=app.settings.theme||'system';
+    const meta=$('theme-color-meta'); if(meta) meta.content=eff==='dark'?'#081426':'#10274b';
+    const btn=$('theme-toggle');
+    if(btn){
+      btn.textContent=eff==='dark'?'☀ Light mode':'☾ Dark mode';
+      btn.setAttribute('aria-label',eff==='dark'?'Switch to light mode':'Switch to dark mode');
+      btn.title=app.settings.theme==='system'?`Using device setting (${eff})`:`Current theme: ${eff}`;
+    }
+  }
   function touch(obj){ obj.updatedAt=nowISO(); app.meta.updatedAt=obj.updatedAt; app.meta.appVersion=VERSION; }
   function saveLocal(reason='Change saved', options={}){
     touch(active());
@@ -169,7 +189,7 @@
     return tasks;
   }
   function canDrag(){ return !app.settings.finishMode && !app.settings.hideCompleted && !app.settings.completedBottom; }
-  function renderAll(){ rolloverAll(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); }
+  function renderAll(){ rolloverAll(); applyTheme(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
     app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.innerHTML=`<span>${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
@@ -237,7 +257,7 @@
   function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data?`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
   function copySetup(){ if(app.profiles.length<2){toast('Add another character first.');return;}const targets=app.profiles.filter(p=>p.id!==app.activeProfileId);const msg=targets.map((p,i)=>`${i+1}. ${p.name}`).join('\n');const pick=prompt(`Copy quest setup FROM which character?\n\n${msg}`);if(pick===null)return;const src=targets[Number(pick)-1];if(!src){toast('That selection was not valid.','bad');return;}if(!confirm(`Replace ${active().name}'s quest setup with ${src.name}'s setup? Current completion checks will be cleared.`))return;createSnapshot('Before copying character setup');active().daily=src.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));active().weekly=src.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));saveLocal('Character quest setup copied');renderAll();toast(`Copied ${src.name}'s quest setup.`,'good'); }
 
-  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
+  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
   function renderCategoryChips(){ const root=$('category-chips');root.replaceChildren();app.categories.forEach(c=>{const chip=document.createElement('span');chip.className='category-chip';chip.append(document.createTextNode(c));if(c!=='General'){const b=document.createElement('button');b.type='button';b.textContent='×';b.title=`Delete ${c}`;b.addEventListener('click',()=>deleteCategory(c));chip.append(b)}root.append(chip)}); }
   function addCategory(){ const c=norm($('new-category-name').value).slice(0,30);if(!c)return;if(app.categories.some(x=>x.toLowerCase()===c.toLowerCase())){toast('That category already exists.');return;}app.categories.push(c);$('new-category-name').value='';saveLocal('Category added');renderCategoryChips(); }
   function deleteCategory(c){ const used=app.profiles.some(p=>[...p.daily,...p.weekly].some(t=>t.category===c));if(used&&!confirm(`Move quests in “${c}” to General and delete this category?`))return;app.profiles.forEach(p=>[...p.daily,...p.weekly].forEach(t=>{if(t.category===c)t.category='General'}));app.categories=app.categories.filter(x=>x!==c);saveLocal('Category deleted',{snapshot:true,snapshotReason:'Before category deletion'});renderAll(); }
@@ -304,8 +324,10 @@
     $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKind(k);renderQuick()}));
     $('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
-    $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
+    $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;saveLocal('Settings changed');renderAll()}));
+    $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
+    const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
     $('restore-snapshot').addEventListener('click',()=>{renderSnapshots();$('snapshot-dialog').showModal()});$('export-backup').addEventListener('click',exportBackup);$('import-backup').addEventListener('click',()=>$('backup-file').click());$('backup-file').addEventListener('change',()=>{const f=$('backup-file').files?.[0];if(f)importBackupFile(f);$('backup-file').value=''});
     $('copy-sync-code').addEventListener('click',async()=>{try{await copyText(manualCode());toast('Manual sync code copied.','good')}catch(e){prompt('Copy this sync code:',manualCode())}});$('import-sync-code').addEventListener('click',()=>{const c=prompt('Paste an RTNW5 manual sync code:');if(c===null)return;try{const incoming=importManualCode(c);if(!confirm('Replace this device\'s tracker data with the imported sync code?'))return;createSnapshot('Before manual sync import');app=incoming;localStorage.setItem(STORAGE_KEY,JSON.stringify(app));dirtySinceCloud=true;renderAll();scheduleCloudPush();toast('Manual sync imported.','good')}catch(e){toast(e.message,'bad')}});
     $('cloud-create').addEventListener('click',cloudCreate);$('cloud-join').addEventListener('click',cloudJoin);$('cloud-sync-now').addEventListener('click',async()=>{try{await cloudPull(false);await cloudPush(false);toast('Cloud sync complete.','good')}catch(e){toast(e.message,'bad')}});$('cloud-copy-code').addEventListener('click',async()=>{if(!cloud)return;try{await copyText(pairCode());toast('Pairing code copied.','good')}catch(e){prompt('Copy this pairing code:',pairCode())}});$('cloud-disconnect').addEventListener('click',cloudDisconnect);
