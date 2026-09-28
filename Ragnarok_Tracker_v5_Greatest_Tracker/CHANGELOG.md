@@ -1,3 +1,22 @@
+# v5.1.1
+
+- Fixed Character dialog × and Cancel buttons being blocked by required-field validation.
+- Applied the same explicit close behavior to tracker dialogs for consistency.
+- Bumped PWA cache and asset version to force browsers to receive the bug fix.
+- Updated documentation for the current Vercel Root Directory workflow.
+
+# v5.1.0
+
+- Added Device setting, Light mode, and Dark mode appearance options.
+- Added quick theme toggle and dark-theme component styling.
+- Added startup theme detection and theme preference syncing in tracker state.
+
+# v5.1.0
+- Added Light, Dark, and Device color themes.
+- Added one-click Light/Dark switch in the hero header.
+- Theme preference persists and participates in cloud/manual backups.
+- Updated PWA cache and health version to 5.1.0.
+
 # v5.0.0
 
 - Rebuilt tracker into modular PWA assets.

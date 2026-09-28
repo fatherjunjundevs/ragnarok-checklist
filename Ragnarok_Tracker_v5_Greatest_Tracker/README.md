@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.0
+# Ragnarok: The New World Tracker v5.1
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -19,6 +19,11 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 13. Per-quest notes.
 14. Favorites and priority levels (Normal, Low, High, Urgent).
 15. Finish Before Reset mode that hides completed quests and prioritizes favorites/urgent work.
+16. Appearance control with Light, Dark, and Device themes, plus a one-click theme switch in the header.
+
+## Appearance
+
+Choose **Device setting**, **Light mode**, or **Dark mode** in Settings. A quick header button switches between Light and Dark. The preference is saved with tracker state and can sync across paired devices.
 
 ## Existing-data migration
 
@@ -41,7 +46,7 @@ The pairing code is effectively a password. The secret is sent only over HTTPS t
 
 ## Deployment
 
-Upload the full contents of this folder to the root of the GitHub repository connected to Vercel. Preserve the `assets/` and `api/` folders. Vercel will deploy the static PWA and the `/api` serverless functions from the same repository.
+The production source lives in `Ragnarok_Tracker_v5_Greatest_Tracker/`, which is configured as the Vercel Root Directory. Update files inside that folder and preserve the `assets/` and `api/` subfolders. Do not create another nested tracker folder.
 
 Files that must be present:
 
@@ -73,3 +78,8 @@ The app attempts autoplay when the user preference is enabled. Browsers may bloc
 ## Reminder limitation
 
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
+
+
+## v5.1.1 modal fix
+
+Modal close controls are explicit non-submit buttons. This prevents required form fields (such as a blank character name) from blocking the × and Cancel controls. Escape/Cancel events also close the dialog explicitly.

@@ -21,7 +21,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.1.0">
+  <link rel="stylesheet" href="/assets/app.css?v=5.1.1">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -187,7 +187,7 @@
     </section>
 
     <footer class="footer">
-      <span>Ragnarok Tracker v5.1</span>
+      <span>Ragnarok Tracker v5.1.1</span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
       <span id="save-status">Saved locally</span>
     </footer>
@@ -197,7 +197,7 @@
 
   <dialog id="task-dialog" class="modal">
     <form method="dialog" id="task-form">
-      <div class="modal-head"><div><span class="section-kicker" id="task-dialog-kicker">Quest</span><h3 id="task-dialog-title">Edit quest</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="section-kicker" id="task-dialog-kicker">Quest</span><h3 id="task-dialog-title">Edit quest</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <input type="hidden" id="task-id"><input type="hidden" id="task-kind">
       <label>Quest name<input id="task-name" maxlength="80" required></label>
       <div class="form-grid">
@@ -206,13 +206,13 @@
       </div>
       <label>Quest notes<textarea id="task-note" rows="4" maxlength="500" placeholder="Party needed, use 2x EXP, farming route, reminder…"></textarea></label>
       <label class="checkline"><input type="checkbox" id="task-favorite"> Keep this quest as a favorite</label>
-      <div class="modal-actions"><button type="button" class="danger" id="task-delete">Delete</button><span class="spacer"></span><button value="cancel">Cancel</button><button class="primary" id="task-save" value="default">Save quest</button></div>
+      <div class="modal-actions"><button type="button" class="danger" id="task-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" id="task-save" value="default">Save quest</button></div>
     </form>
   </dialog>
 
   <dialog id="character-dialog" class="modal">
     <form method="dialog" id="character-form">
-      <div class="modal-head"><div><span class="section-kicker">Character</span><h3 id="character-dialog-title">Character profile</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="section-kicker">Character</span><h3 id="character-dialog-title">Character profile</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <input type="hidden" id="character-id">
       <label>Character name<input id="character-name" maxlength="40" required></label>
       <div class="form-grid">
@@ -220,13 +220,13 @@
         <label>Portrait<select id="character-avatar"><option>⚔️</option><option>✨</option><option>🛡️</option><option>🏹</option><option>🔮</option><option>🗡️</option><option>🐱</option><option>👑</option><option>🌸</option><option>🔥</option></select></label>
       </div>
       <label class="checkline" id="character-copy-wrap"><input type="checkbox" id="character-copy-quests"> Copy quest setup from the active character</label>
-      <div class="modal-actions"><button type="button" class="danger" id="character-delete">Delete</button><span class="spacer"></span><button value="cancel">Cancel</button><button class="primary" id="character-save" value="default">Save character</button></div>
+      <div class="modal-actions"><button type="button" class="danger" id="character-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" id="character-save" value="default">Save character</button></div>
     </form>
   </dialog>
 
   <dialog id="history-dialog" class="modal wide">
     <form method="dialog">
-      <div class="modal-head"><div><span class="section-kicker">Progress archive</span><h3>Completion History</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="section-kicker">Progress archive</span><h3>Completion History</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <div id="history-summary" class="history-summary"></div>
       <h4>Recent server days</h4>
       <div id="history-calendar" class="history-calendar"></div>
@@ -238,7 +238,7 @@
 
   <dialog id="settings-dialog" class="modal wide">
     <form method="dialog" id="settings-form">
-      <div class="modal-head"><div><span class="section-kicker">Tracker preferences</span><h3>Settings</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="section-kicker">Tracker preferences</span><h3>Settings</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <div class="settings-grid">
         <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
         <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
@@ -257,12 +257,12 @@
 
   <dialog id="snapshot-dialog" class="modal wide">
     <form method="dialog">
-      <div class="modal-head"><div><span class="section-kicker">Safety net</span><h3>Restore Previous Version</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="section-kicker">Safety net</span><h3>Restore Previous Version</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <p class="muted">Restoring creates a safety snapshot of your current tracker first.</p>
       <div id="snapshot-list" class="snapshot-list"></div>
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.1.0" defer></script>
+  <script src="/assets/app.js?v=5.1.1" defer></script>
 </body>
 </html>

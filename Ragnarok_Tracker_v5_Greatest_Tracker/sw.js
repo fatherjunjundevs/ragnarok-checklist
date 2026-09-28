@@ -1,6 +1,6 @@
-const CACHE = 'rtnw-tracker-v5.1.0';
+const CACHE = 'rtnw-tracker-v5.1.1';
 const CORE = [
-  '/', '/index.html', '/manifest.webmanifest', '/assets/app.css?v=5.1.0', '/assets/app.js?v=5.1.0',
+  '/', '/index.html', '/manifest.webmanifest', '/assets/app.css?v=5.1.1', '/assets/app.js?v=5.1.1',
   '/assets/prontera.webp', '/assets/prontera.mp3', '/icon-192.png', '/icon-512.png'
 ];
 
