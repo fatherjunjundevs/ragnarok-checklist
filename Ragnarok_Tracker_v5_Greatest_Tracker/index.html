@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10274b">
+  <meta name="description" content="Ragnarok: The New World daily and weekly quest tracker with multi-character support, history, reminders, offline mode, and optional cloud sync.">
+  <title>Ragnarok: The New World Tracker</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preload" as="image" href="/assets/prontera.webp">
+  <link rel="stylesheet" href="/assets/app.css?v=5.0.0">
+</head>
+<body>
+  <div id="update-banner" class="update-banner" hidden>
+    <span><b>New tracker update ready.</b> Refresh to use it.</span>
+    <button id="apply-update" type="button">Update now</button>
+  </div>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="welcome" class="welcome" hidden>
+    <div class="welcome-panel" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+      <span class="eyebrow">Welcome, adventurer</span>
+      <h2 id="welcome-title">Ready for your quests?</h2>
+      <p id="welcome-copy">Theme of Prontera is ready. Your browser may require one tap before sound can start.</p>
+      <div class="welcome-actions">
+        <button class="primary" id="enter-play" type="button">♫ Enter &amp; Play</button>
+        <button id="enter-quiet" type="button">Enter quietly</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app-shell" id="app-shell">
+    <header class="hero">
+      <div class="hero-art" aria-hidden="true"></div>
+      <div class="hero-overlay" aria-hidden="true"></div>
+      <div class="hero-content">
+        <div class="hero-copy">
+          <span class="eyebrow">Adventure tracker</span>
+          <h1>Ragnarok:<br><span>The New World</span></h1>
+          <p>Daily quests, weeklies, characters, history, notes, priorities, reminders, offline play, and cloud-ready sync.</p>
+        </div>
+        <div class="hero-actions">
+          <button class="ghost" id="install-app" type="button" hidden>＋ Install App</button>
+          <button class="ghost" id="open-settings" type="button">⚙ Settings</button>
+          <button class="ghost" id="open-history" type="button">▦ History</button>
+        </div>
+      </div>
+
+      <div class="server-strip">
+        <div><span>Server time</span><strong id="server-clock">--:--:--</strong><small>UTC+7</small></div>
+        <div><span>Daily reset</span><strong id="daily-countdown">--</strong><small>5:00 AM UTC+7</small></div>
+        <div><span>Weekly reset</span><strong>Monday</strong><small>5:00 AM UTC+7</small></div>
+        <div><span>Connection</span><strong id="network-status">Online</strong><small id="cloud-mini">Local save</small></div>
+      </div>
+
+      <div class="music-strip">
+        <button id="music-toggle" type="button">♫ Play music</button>
+        <label>Volume <input id="music-volume" type="range" min="0" max="100" value="35"></label>
+        <button id="choose-music" type="button">Change music</button>
+        <input id="music-file" type="file" accept="audio/*" hidden>
+        <button id="restore-music" type="button" hidden>Restore Prontera</button>
+        <span id="music-name">Theme of Prontera · ready</span>
+      </div>
+    </header>
+
+    <section class="character-dock" aria-label="Character profiles">
+      <div class="character-tabs" id="character-tabs"></div>
+      <div class="character-tools">
+        <button id="add-character" type="button">＋ Character</button>
+        <button id="copy-character" type="button">Copy setup</button>
+        <button id="edit-character" type="button">Edit</button>
+      </div>
+    </section>
+
+    <nav class="quickbar" id="quickbar" aria-label="Quick tracker controls">
+      <select class="character-chip" id="quick-character-select" aria-label="Quick character switch"></select>
+      <div class="quick-progress"><span>Dailies</span><b id="quick-daily">0/0</b></div>
+      <div class="quick-progress"><span>Weeklies</span><b id="quick-weekly">0/0</b></div>
+      <div class="quick-reset"><span>Reset</span><b id="quick-reset">--</b></div>
+      <button class="toggle" id="toggle-hide-completed" type="button" aria-pressed="false">Hide completed</button>
+      <button class="toggle danger-glow" id="toggle-finish-mode" type="button" aria-pressed="false">⚔ Finish before reset</button>
+    </nav>
+
+    <section class="dashboard" aria-label="Quest dashboard">
+      <section class="quest-card" id="daily-card">
+        <div class="section-heading">
+          <div>
+            <span class="section-kicker">Server day</span>
+            <h2>☀ Dailies</h2>
+            <p id="daily-date" class="muted"></p>
+          </div>
+          <div class="section-head-actions">
+            <span class="count-badge" id="daily-count">0 / 0</span>
+            <button class="collapse-btn" data-collapse="daily" type="button" aria-expanded="true">Collapse</button>
+          </div>
+        </div>
+        <div class="progress-shell" role="progressbar" aria-label="Daily progress" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"><span id="daily-bar"></span></div>
+        <div class="section-body" id="daily-body">
+          <div class="category-toolbar">
+            <span>Drag ⋮⋮ to reorder or move a quest between categories.</span>
+            <button type="button" data-add-task="daily">＋ Add daily</button>
+          </div>
+          <div class="category-groups" id="daily-groups"></div>
+          <div class="section-bottom-actions">
+            <button type="button" data-clear-checks="daily">Clear daily checks</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="quest-card" id="weekly-card">
+        <div class="section-heading">
+          <div>
+            <span class="section-kicker">Server week</span>
+            <h2>✦ Weeklies</h2>
+            <p id="weekly-date" class="muted"></p>
+          </div>
+          <div class="section-head-actions">
+            <span class="count-badge alt" id="weekly-count">0 / 0</span>
+            <button class="collapse-btn" data-collapse="weekly" type="button" aria-expanded="true">Collapse</button>
+          </div>
+        </div>
+        <div class="progress-shell alt" role="progressbar" aria-label="Weekly progress" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"><span id="weekly-bar"></span></div>
+        <div class="section-body" id="weekly-body">
+          <div class="category-toolbar">
+            <span>Weeklies use the same notes, favorites, priorities, and drag ordering.</span>
+            <button type="button" data-add-task="weekly">＋ Add weekly</button>
+          </div>
+          <div class="category-groups" id="weekly-groups"></div>
+          <div class="section-bottom-actions">
+            <button type="button" data-clear-checks="weekly">Clear weekly checks</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="utility-grid">
+      <article class="utility-card" id="cloud-card">
+        <div class="utility-title"><div><span class="section-kicker">Across devices</span><h3>☁ Cloud Sync</h3></div><span class="status-pill" id="cloud-status-pill">Checking…</span></div>
+        <p id="cloud-status-text">Checking whether cloud sync is configured on this deployment.</p>
+        <div class="utility-actions">
+          <button class="primary" id="cloud-create" type="button">Create pairing</button>
+          <button id="cloud-join" type="button">Join with code</button>
+          <button id="cloud-sync-now" type="button">Sync now</button>
+          <button id="cloud-copy-code" type="button">Copy pairing code</button>
+          <button id="cloud-disconnect" type="button">Disconnect</button>
+        </div>
+        <p class="tiny">Your pairing code works like a password. Keep it private. Local saving continues even when cloud sync is unavailable.</p>
+      </article>
+
+      <article class="utility-card">
+        <div class="utility-title"><div><span class="section-kicker">Safety net</span><h3>↶ Backups &amp; Restore</h3></div><span class="status-pill good" id="snapshot-count">0 snapshots</span></div>
+        <p>Automatic local snapshots are created before destructive changes and periodically while you play.</p>
+        <div class="utility-actions">
+          <button id="restore-snapshot" type="button">Restore previous</button>
+          <button id="export-backup" type="button">Export JSON</button>
+          <button id="import-backup" type="button">Import JSON</button>
+          <input id="backup-file" type="file" accept="application/json,.json" hidden>
+          <button id="copy-sync-code" type="button">Copy manual sync code</button>
+          <button id="import-sync-code" type="button">Import manual sync code</button>
+        </div>
+      </article>
+
+      <article class="utility-card reminder-card">
+        <div class="utility-title"><div><span class="section-kicker">Before reset</span><h3>🔔 Reminders</h3></div><span class="status-pill" id="reminder-status">Off</span></div>
+        <p>Optional browser reminders warn you when unfinished quests are approaching the daily reset.</p>
+        <div class="reminder-row">
+          <label><input id="reminders-enabled" type="checkbox"> Enable reminders</label>
+          <label>Warn me <select id="reminder-hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="6">6 hours</option></select> before reset</label>
+        </div>
+        <p class="tiny">Browser notifications can be shown while the tracker is open. Background delivery depends on browser/PWA support.</p>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <span>Ragnarok Tracker v5.0</span>
+      <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
+      <span id="save-status">Saved locally</span>
+    </footer>
+  </main>
+
+  <audio id="theme-audio" loop preload="metadata" src="/assets/prontera.mp3"></audio>
+
+  <dialog id="task-dialog" class="modal">
+    <form method="dialog" id="task-form">
+      <div class="modal-head"><div><span class="section-kicker" id="task-dialog-kicker">Quest</span><h3 id="task-dialog-title">Edit quest</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <input type="hidden" id="task-id"><input type="hidden" id="task-kind">
+      <label>Quest name<input id="task-name" maxlength="80" required></label>
+      <div class="form-grid">
+        <label>Category<select id="task-category"></select></label>
+        <label>Priority<select id="task-priority"><option value="0">Normal</option><option value="1">Low</option><option value="2">High</option><option value="3">Urgent</option></select></label>
+      </div>
+      <label>Quest notes<textarea id="task-note" rows="4" maxlength="500" placeholder="Party needed, use 2x EXP, farming route, reminder…"></textarea></label>
+      <label class="checkline"><input type="checkbox" id="task-favorite"> Keep this quest as a favorite</label>
+      <div class="modal-actions"><button type="button" class="danger" id="task-delete">Delete</button><span class="spacer"></span><button value="cancel">Cancel</button><button class="primary" id="task-save" value="default">Save quest</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="character-dialog" class="modal">
+    <form method="dialog" id="character-form">
+      <div class="modal-head"><div><span class="section-kicker">Character</span><h3 id="character-dialog-title">Character profile</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <input type="hidden" id="character-id">
+      <label>Character name<input id="character-name" maxlength="40" required></label>
+      <div class="form-grid">
+        <label>Class / Job<input id="character-class" maxlength="40" placeholder="e.g. High Priest"></label>
+        <label>Portrait<select id="character-avatar"><option>⚔️</option><option>✨</option><option>🛡️</option><option>🏹</option><option>🔮</option><option>🗡️</option><option>🐱</option><option>👑</option><option>🌸</option><option>🔥</option></select></label>
+      </div>
+      <label class="checkline" id="character-copy-wrap"><input type="checkbox" id="character-copy-quests"> Copy quest setup from the active character</label>
+      <div class="modal-actions"><button type="button" class="danger" id="character-delete">Delete</button><span class="spacer"></span><button value="cancel">Cancel</button><button class="primary" id="character-save" value="default">Save character</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="history-dialog" class="modal wide">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Progress archive</span><h3>Completion History</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div id="history-summary" class="history-summary"></div>
+      <h4>Recent server days</h4>
+      <div id="history-calendar" class="history-calendar"></div>
+      <h4>Recent server weeks</h4>
+      <div id="weekly-history" class="weekly-history"></div>
+      <div class="legend"><span><i class="dot complete"></i>Complete</span><span><i class="dot partial"></i>Partial</span><span><i class="dot none"></i>No record</span></div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog" class="modal wide">
+    <form method="dialog" id="settings-form">
+      <div class="modal-head"><div><span class="section-kicker">Tracker preferences</span><h3>Settings</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="settings-grid">
+        <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
+        <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
+        <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Fit more quests on screen.</small></span></label>
+        <label class="setting-tile"><input id="setting-ui-sounds" type="checkbox"><span><b>Quest UI sounds</b><small>Small confirmation tones for quest actions.</small></span></label>
+        <label class="setting-tile"><input id="setting-autoplay" type="checkbox"><span><b>Try music autoplay</b><small>Attempt Prontera music on load when the browser allows it.</small></span></label>
+        <label class="setting-tile"><input id="setting-finish-auto" type="checkbox"><span><b>Suggest finish mode near reset</b><small>Highlight unfinished priorities in the final 2 hours.</small></span></label>
+      </div>
+      <h4>Category management</h4>
+      <div class="category-manager"><input id="new-category-name" maxlength="30" placeholder="New category"><button type="button" id="add-category">Add category</button></div>
+      <div id="category-chips" class="category-chips"></div>
+      <div class="modal-actions"><span class="spacer"></span><button class="primary" value="default">Done</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="snapshot-dialog" class="modal wide">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Safety net</span><h3>Restore Previous Version</h3></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <p class="muted">Restoring creates a safety snapshot of your current tracker first.</p>
+      <div id="snapshot-list" class="snapshot-list"></div>
+    </form>
+  </dialog>
+
+  <script src="/assets/app.js?v=5.0.0" defer></script>
+</body>
+</html>
