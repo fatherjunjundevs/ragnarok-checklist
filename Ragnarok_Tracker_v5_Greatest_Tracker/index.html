@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.3.0"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.3.0">
+  <script src="/assets/theme-init.js?v=5.4.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.4.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -86,15 +86,18 @@
         </div>
       </div>
 
-      <div class="music-strip">
-        <button id="music-toggle" type="button">♫ Play music</button>
-        <button class="music-unlock" id="music-unlock" type="button" hidden>♫ Tap to enable music</button>
-        <label>Volume <input id="music-volume" type="range" min="0" max="100" value="35"></label>
-        <button id="choose-music" type="button">Change music</button>
-        <input id="music-file" type="file" accept="audio/*" hidden>
-        <button id="restore-music" type="button" hidden>Restore Prontera</button>
-        <span id="music-name">Theme of Prontera · ready</span>
-      </div>
+      <details class="music-strip music-player" id="music-player">
+        <summary><span aria-hidden="true">♫</span><strong>Prontera Music</strong><small id="music-summary-state">Tap to open player</small></summary>
+        <div class="music-player-controls">
+          <button id="music-toggle" type="button">♫ Play music</button>
+          <button class="music-unlock" id="music-unlock" type="button" hidden>♫ Tap to enable music</button>
+          <label>Volume <input id="music-volume" type="range" min="0" max="100" value="35"></label>
+          <button id="choose-music" type="button">Change music</button>
+          <input id="music-file" type="file" accept="audio/*" hidden>
+          <button id="restore-music" type="button" hidden>Restore Prontera</button>
+          <span id="music-name">Theme of Prontera · ready</span>
+        </div>
+      </details>
     </header>
 
     <section class="character-dock" id="character-dock" aria-label="Character profiles">
@@ -107,12 +110,17 @@
     </section>
 
     <nav class="quickbar" id="quickbar" aria-label="Quick tracker controls">
-      <select class="character-chip" id="quick-character-select" aria-label="Quick character switch"></select>
-      <div class="quick-progress"><span>Dailies</span><b id="quick-daily">0/0</b></div>
-      <div class="quick-progress"><span>Weeklies</span><b id="quick-weekly">0/0</b></div>
-      <div class="quick-reset"><span>Reset</span><b id="quick-reset">--</b></div>
-      <button class="toggle" id="toggle-hide-completed" type="button" aria-pressed="false">Hide completed</button>
-      <button class="toggle danger-glow" id="toggle-finish-mode" type="button" aria-pressed="false">⚔ Finish before reset</button>
+      <div class="quickbar-row quickbar-primary">
+        <select class="character-chip" id="quick-character-select" aria-label="Quick character switch"></select>
+        <div class="quick-progress"><span>Dailies</span><b id="quick-daily">0/0</b></div>
+        <div class="quick-progress"><span>Weeklies</span><b id="quick-weekly">0/0</b></div>
+        <div class="quick-reset"><span>Reset</span><b id="quick-reset">--</b></div>
+      </div>
+      <div class="quickbar-row quickbar-actions">
+        <button class="toggle" id="toggle-hide-completed" type="button" aria-pressed="false">Hide completed</button>
+        <button class="toggle danger-glow" id="toggle-finish-mode" type="button" aria-pressed="false">⚔ Finish before reset</button>
+        <button class="toggle organize-toggle" id="toggle-organize" type="button" aria-pressed="false">↕ Organize</button>
+      </div>
     </nav>
 
     <section class="dashboard" aria-label="Quest dashboard">
@@ -132,7 +140,7 @@
         <div class="progress-shell" role="progressbar" aria-label="Daily progress" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"><span id="daily-bar"></span></div>
         <div class="section-body" id="daily-body">
           <div class="category-toolbar">
-            <span>Drag ⋮⋮ to reorder or move a quest between categories.</span>
+            <span>Use Organize mode to pick up, reorder, or move quests between categories.</span>
             <button type="button" data-add-task="daily">＋ Add daily</button>
           </div>
           <div class="category-groups" id="daily-groups"></div>
@@ -142,6 +150,7 @@
         </div>
       </section>
 
+      <aside class="dashboard-sidebar">
       <section class="quest-card" id="weekly-card">
         <div class="section-heading">
           <div>
@@ -158,7 +167,7 @@
         <div class="progress-shell alt" role="progressbar" aria-label="Weekly progress" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"><span id="weekly-bar"></span></div>
         <div class="section-body" id="weekly-body">
           <div class="category-toolbar">
-            <span>Weeklies use the same notes, favorites, priorities, and drag ordering.</span>
+            <span>Weeklies support counters, guidance, priorities, and Organize mode.</span>
             <button type="button" data-add-task="weekly">＋ Add weekly</button>
           </div>
           <div class="category-groups" id="weekly-groups"></div>
@@ -167,6 +176,22 @@
           </div>
         </div>
       </section>
+
+      <section class="side-card all-character-card" id="all-character-card">
+        <div class="side-card-head"><div><span class="section-kicker">Your roster</span><h3>👥 All Characters</h3></div><span class="status-pill">Overview</span></div>
+        <p class="side-card-copy">See unfinished work across every character. Tap a character to switch.</p>
+        <div id="all-character-list" class="all-character-list"></div>
+      </section>
+
+      <section class="side-card session-planner-card" id="session-planner-card">
+        <div class="side-card-head"><div><span class="section-kicker">Quick session</span><h3>⏱ What can I finish?</h3></div><span class="status-pill good" id="session-plan-summary">15 min</span></div>
+        <label class="session-time-label">I have
+          <select id="session-minutes" aria-label="Available play time"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">90 minutes</option><option value="120">2 hours</option></select>
+        </label>
+        <p class="side-card-copy">Suggestions favor urgent, high-priority, favorite, and shorter unfinished quests.</p>
+        <div id="session-plan-list" class="session-plan-list"></div>
+      </section>
+      </aside>
     </section>
 
     <section class="utility-grid">
@@ -243,7 +268,7 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.3.0</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.4.0</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
       <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
@@ -270,7 +295,20 @@
         <label>Category<select id="task-category"></select></label>
         <label>Priority<select id="task-priority"><option value="0">Normal</option><option value="1">Low</option><option value="2">High</option><option value="3">Urgent</option></select></label>
       </div>
-      <label>Quest notes<textarea id="task-note" rows="4" maxlength="500" placeholder="Party needed, use 2x EXP, farming route, reminder…"></textarea></label>
+      <div class="form-grid task-number-grid">
+        <label>Target runs<input id="task-target" type="number" min="1" max="99" value="1" inputmode="numeric"><small>Use 1 for a normal checkbox quest.</small></label>
+        <label>Current progress<input id="task-progress" type="number" min="0" max="99" value="0" inputmode="numeric"><small>Reaching the target completes the quest.</small></label>
+        <label>Estimated time<input id="task-duration" type="number" min="1" max="240" value="10" inputmode="numeric"><small>Minutes used by the short-session planner.</small></label>
+      </div>
+      <details class="quest-guidance-editor" open>
+        <summary>Quest guidance &amp; notes</summary>
+        <div class="form-grid">
+          <label>Prerequisites<input id="task-prerequisites" maxlength="200" placeholder="Level, party, item, unlock…"></label>
+          <label>Location<input id="task-location" maxlength="200" placeholder="Map, NPC, dungeon…"></label>
+        </div>
+        <label>Rewards<input id="task-rewards" maxlength="200" placeholder="EXP, currency, chest, materials…"></label>
+        <label>Quest notes<textarea id="task-note" rows="4" maxlength="500" placeholder="Party needed, use 2x EXP, farming route, reminder…"></textarea></label>
+      </details>
       <label class="checkline"><input type="checkbox" id="task-favorite"> Keep this quest as a favorite</label>
       <div class="modal-actions"><button type="button" class="danger" id="task-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" id="task-save" value="default">Save quest</button></div>
     </form>
@@ -314,7 +352,7 @@
         </div>
       </section>
       <section class="settings-section">
-        <div class="settings-section-head"><span aria-hidden="true">⚔️</span><div><h4>Gameplay</h4><p>Control how completed and urgent quests are organized.</p></div></div>
+        <div class="settings-section-head"><span aria-hidden="true">⚔️</span><div><h4>Gameplay</h4><p>Control how completed and urgent quests are organized. Use the toolbar’s Organize mode for drag-and-drop editing.</p></div></div>
         <div class="settings-grid">
           <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
           <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Move completed to bottom</b><small>Keep completed quests visible but out of the way.</small></span></label>
@@ -340,7 +378,7 @@
       <section class="settings-section settings-about-section">
         <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
         <div class="about-settings">
-          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.3.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.4.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
           <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
         </div>
       </section>
@@ -399,6 +437,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.3.0" defer></script>
+  <script src="/assets/app.js?v=5.4.0" defer></script>
 </body>
 </html>

@@ -1,3 +1,22 @@
+# v5.4.0 — Everyday Questing Upgrade
+
+- Compacted the hero/header so checklist content appears sooner on desktop and mobile.
+- Converted the Prontera music controls into a compact expandable player while preserving the working Enter with Music flow.
+- Rebuilt the mobile quick controls as two non-scrolling rows so character, reset, filters, Finish mode, and Organize mode stay reachable.
+- Added Organize mode so drag handles and Edit controls stay hidden during normal questing.
+- Added a lifted floating-card drag effect for more natural drag-and-drop reordering and category moves.
+- Allowed quest names to wrap to two lines and made the checkbox/name area easier to tap.
+- Rebalanced desktop layout with a wider Dailies column and a narrower sidebar for Weeklies, roster overview, and session planning.
+- Added optional quest run counters with +/- controls and automatic completion at the target.
+- Added editable quest duration estimates and reset-safe counter migration for existing tracker data.
+- Added an all-character overview with daily/weekly progress and remaining counts.
+- Added a short-session planner for 15–120 minute play windows.
+- Added optional quest guidance fields for prerequisites, location, rewards, and notes behind expandable details.
+- Extended cloud-sync validation for counter, duration, and guidance fields; no Supabase schema change is required.
+- Added a cloud downgrade guard so an older client cannot overwrite v5.4 quest-counter/guidance data after a room has been upgraded.
+- Preserved v5.2 security hardening, v5.2.1 music behavior, Elite, UTC+7 reset logic, and iOS drag protections.
+- Bumped application, API health, assets, and service-worker cache to v5.4.0.
+
 # v5.3.0 — Adventure UI Upgrade
 
 - Added RPG-style category icons and per-category completion counters.
@@ -22,7 +41,7 @@
 - Added an iPhone/iPad Add to Home Screen helper modal and made the install control discoverable on iOS.
 - Kept the Favorite star visible on mobile quest rows.
 - Replaced the Cloud Join browser prompt with a styled pairing modal, paste helper, and pairing-code safety reminder.
-- Bumped application, API health, assets, and service-worker cache to v5.3.0.
+- Bumped application, API health, assets, and service-worker cache to v5.2.1.
 
 # v5.2.0 — Security Hardening
 
