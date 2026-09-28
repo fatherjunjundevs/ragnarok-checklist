@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.1.1';
+  const VERSION = '5.1.2';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
@@ -239,8 +239,9 @@
   function escapeHTML(v){ const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML; }
   function setPressed(id,v){ const el=$(id);el?.setAttribute('aria-pressed',String(!!v)); }
 
-  function startDrag(e,kind,id){ if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();const row=e.currentTarget.closest('.task-row');drag={kind,id,row,handle:e.currentTarget,pointerId:e.pointerId};row.classList.add('dragging');document.body.classList.add('drag-active');e.currentTarget.setPointerCapture?.(e.pointerId); }
-  function dragMove(e){ if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();if(e.clientY<90)scrollBy(0,-14);else if(e.clientY>innerHeight-80)scrollBy(0,14);const el=document.elementFromPoint(e.clientX,e.clientY);const list=el?.closest('.task-list');if(!list||list.dataset.kind!==drag.kind||list.hidden)return;const over=el.closest('.task-row');if(over&&over!==drag.row){const r=over.getBoundingClientRect();list.insertBefore(drag.row,e.clientY<r.top+r.height/2?over:over.nextSibling);}else if(!over){list.append(drag.row);} }
+  function clearTextSelection(){ try{ window.getSelection?.()?.removeAllRanges?.(); }catch(_){} }
+  function startDrag(e,kind,id){ if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();clearTextSelection();const row=e.currentTarget.closest('.task-row');drag={kind,id,row,handle:e.currentTarget,pointerId:e.pointerId};row.classList.add('dragging');document.body.classList.add('drag-active');e.currentTarget.setPointerCapture?.(e.pointerId); }
+  function dragMove(e){ if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();if(e.clientY<90)scrollBy(0,-14);else if(e.clientY>innerHeight-80)scrollBy(0,14);const el=document.elementFromPoint(e.clientX,e.clientY);const list=el?.closest('.task-list');if(!list||list.dataset.kind!==drag.kind||list.hidden)return;const over=el.closest('.task-row');if(over&&over!==drag.row){const r=over.getBoundingClientRect();list.insertBefore(drag.row,e.clientY<r.top+r.height/2?over:over.nextSibling);}else if(!over){list.append(drag.row);} }
   function endDrag(e){ if(!drag||drag.pointerId!==e.pointerId)return;try{drag.handle.releasePointerCapture?.(e.pointerId)}catch(_){}const {kind,id}=drag;drag.row.classList.remove('dragging');document.body.classList.remove('drag-active');const p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set();const reordered=[];
     $$(`.task-list[data-kind="${kind}"]`).forEach(list=>{ $$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})}); p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');drag=null;renderKind(kind);requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus()); }
   function keyboardMove(e,kind,id){ if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveLocal('Quest order changed');renderKind(kind); }
@@ -316,6 +317,8 @@
   function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
 
   function bindUI(){
+    document.addEventListener('selectstart',e=>{ if(drag) e.preventDefault(); },{passive:false});
+    document.addEventListener('contextmenu',e=>{ if(drag || e.target.closest?.('.drag-handle')) e.preventDefault(); });
     $$('[data-dialog-close]').forEach(btn=>btn.addEventListener('click',()=>{ const dialog=btn.closest('dialog'); if(dialog?.open) dialog.close('cancel'); }));
     $$('.modal').forEach(dialog=>dialog.addEventListener('cancel',e=>{ e.preventDefault(); dialog.close('cancel'); }));
     $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted)app.settings.completedBottom=false;saveLocal('Filter changed');renderAll()});
