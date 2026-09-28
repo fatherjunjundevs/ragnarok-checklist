@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.4.0
+# Ragnarok: The New World Tracker v5.4.1
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -131,6 +131,13 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.4.1 — Smooth Organize drag patch
+
+- Reworked Organize-mode drag-and-drop so the original quest no longer appears as a translucent duplicate under the floating card.
+- Added a dedicated drop slot and category highlight for a clearer destination while reordering or moving quests.
+- Switched floating-card motion to GPU-friendly requestAnimationFrame/translate3d updates for smoother mouse and touch tracking.
+- Added subtle neighboring-row movement and smoother edge auto-scroll during drag.
 
 ### v5.4.0 — Everyday Questing upgrade
 
