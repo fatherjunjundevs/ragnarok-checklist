@@ -65,6 +65,16 @@ function isObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v);
 function isString(v, min, max) { return typeof v === 'string' && v.length >= min && v.length <= max; }
 function isIsoDate(v) { return typeof v === 'string' && v.length <= 64 && Number.isFinite(Date.parse(v)); }
 function isDateKey(v) { return typeof v === 'string' && DATE_KEY_RE.test(v); }
+function appVersionParts(v) {
+  const m = String(v || '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  return m ? m.slice(1).map(Number) : null;
+}
+function isOlderAppVersion(incoming, current) {
+  const a = appVersionParts(incoming), b = appVersionParts(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] < b[i]; }
+  return false;
+}
 function hasUnsafeKeys(value, depth = 0) {
   if (depth > 12) return true;
   if (!value || typeof value !== 'object') return false;
@@ -80,6 +90,20 @@ function validateTask(task) {
   if (typeof task.done !== 'boolean' || typeof task.favorite !== 'boolean') return false;
   if (!isString(task.note, 0, 500) || !isString(task.category, 1, 30)) return false;
   if (!Number.isInteger(task.priority) || task.priority < 0 || task.priority > 3) return false;
+
+  // v5.4 task progress, planning, and optional guidance fields. These remain
+  // optional so older v5.3 clients can still sync during a rolling upgrade.
+  if ('target' in task && (!Number.isInteger(task.target) || task.target < 1 || task.target > 99)) return false;
+  if ('progress' in task && (!Number.isInteger(task.progress) || task.progress < 0 || task.progress > 99)) return false;
+  const target = 'target' in task ? task.target : 1;
+  const progress = 'progress' in task ? task.progress : (task.done ? target : 0);
+  if (progress > target) return false;
+  if (('target' in task || 'progress' in task) && task.done !== (progress >= target)) return false;
+  if ('durationMin' in task && (!Number.isInteger(task.durationMin) || task.durationMin < 1 || task.durationMin > 240)) return false;
+  for (const key of ['prerequisites','location','rewards']) {
+    if (key in task && !isString(task[key], 0, 200)) return false;
+  }
+
   if (!isIsoDate(task.updatedAt)) return false;
   if (task.completedAt !== null && task.completedAt !== undefined && !isIsoDate(task.completedAt)) return false;
   return true;
@@ -102,6 +126,7 @@ function validateSettings(settings) {
   if ('theme' in settings && !['system','light','dark'].includes(settings.theme)) return false;
   if ('musicVolume' in settings && (!Number.isFinite(Number(settings.musicVolume)) || Number(settings.musicVolume) < 0 || Number(settings.musicVolume) > 100)) return false;
   if ('reminderHours' in settings && ![1,2,3,6].includes(Number(settings.reminderHours))) return false;
+  if ('sessionMinutes' in settings && ![15,30,45,60,90,120].includes(Number(settings.sessionMinutes))) return false;
   if ('collapsedSections' in settings) {
     if (!isObject(settings.collapsedSections)) return false;
     for (const key of Object.keys(settings.collapsedSections)) if (!['daily','weekly'].includes(key) || typeof settings.collapsedSections[key] !== 'boolean') return false;
@@ -297,6 +322,13 @@ module.exports = async function handler(req, res) {
       });
       if (!r.ok) throw new Error(`Database revoke failed (${r.status})`);
       return json(res, 200, { ok: true, revoked: true });
+    }
+
+    const serverAppVersion = String(row.payload?.meta?.appVersion || '');
+    const incomingAppVersion = String(body.state?.meta?.appVersion || '');
+    const serverParts = appVersionParts(serverAppVersion);
+    if (serverParts && (serverParts[0] > 5 || (serverParts[0] === 5 && serverParts[1] >= 4)) && isOlderAppVersion(incomingAppVersion, serverAppVersion)) {
+      return json(res, 426, { error: 'This cloud room uses a newer tracker version. Update this device before syncing.' });
     }
 
     const stateError = validateState(body.state);
