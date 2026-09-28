@@ -21,12 +21,9 @@
 # v5.1.0
 
 - Added Device setting, Light mode, and Dark mode appearance options.
-- Added quick theme toggle and dark-theme component styling.
-- Added startup theme detection and theme preference syncing in tracker state.
-
-# v5.1.0
-- Added Light, Dark, and Device color themes.
-- Added one-click Light/Dark switch in the hero header.
+- Added a one-click Light/Dark switch in the hero header.
+- Added dark-theme component styling.
+- Added startup theme detection.
 - Theme preference persists and participates in cloud/manual backups.
 - Updated PWA cache and health version to 5.1.0.
 

@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.1.2
+# Ragnarok: The New World Tracker v5.1.3
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -28,6 +28,8 @@ Choose **Device setting**, **Light mode**, or **Dark mode** in Settings. A quick
 ## Existing-data migration
 
 The app reads the previous local-storage keys (`ragnarok-new-world-checklist-v3` and v1) and migrates characters, quest checks, custom quests, and quest ordering into the v5 state model. Existing `Monster Etermination` data is corrected to `Monster Extermination`.
+
+Existing profiles upgrading to v5.1.3 also receive **Elite** once under the **Hunt** daily category if it is missing, without resetting the rest of their quest progress.
 
 ## Cloud sync setup (one-time)
 
@@ -79,18 +81,18 @@ The app attempts autoplay when the user preference is enabled. Browsers may bloc
 
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
+## Recent fixes
 
-## v5.1.1 modal fix
-
-Modal close controls are explicit non-submit buttons. This prevents required form fields (such as a blank character name) from blocking the × and Cancel controls. Escape/Cancel events also close the dialog explicitly.
-
-
-## v5.1.2 iOS drag fix
-
-Quest drag handles now suppress iOS text selection, touch callouts, and selection ranges while a reorder gesture is active. Normal page text remains selectable when not dragging.
-
-## v5.1.3 Hunt update
+### v5.1.3 — Hunt update
 
 - Added **Elite** to the default **Hunt** daily category alongside MVP and Mini.
 - Existing v5 profiles automatically receive Elite once when first opened on v5.1.3, without resetting completion state for other quests.
 - Includes the v5.1.2 iOS drag text-selection fix.
+
+### v5.1.2 — iOS drag fix
+
+Quest drag handles suppress iOS text selection, touch callouts, and selection ranges while a reorder gesture is active. Normal page text remains selectable when not dragging.
+
+### v5.1.1 — Modal fix
+
+Modal close controls are explicit non-submit buttons. This prevents required form fields (such as a blank character name) from blocking the × and Cancel controls. Escape/Cancel events also close the dialog explicitly.
