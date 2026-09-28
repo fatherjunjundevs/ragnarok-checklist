@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.2.1';
+  const VERSION = '5.3.0';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -24,6 +24,9 @@
     ['Assist and Hand in Hand','Social'],['Catch Pets','Pets'],['Special Events','Event']
   ];
   const DEFAULT_WEEKLY = [['Forgotten Land','Instance'],['Rift Raid','Instance']];
+  const CATEGORY_ICONS = {General:'📜',Guild:'🛡️',PvP:'⚔️',Hunt:'👑',Instance:'🏰',Farming:'🌾',Exploration:'🗺️',Social:'🤝',Pets:'🐾',Event:'🎉'};
+  const CHARACTER_ACCENTS = {gold:'#e7bd6d',teal:'#5cb6aa',violet:'#a98ac8',rose:'#d67f9a',emerald:'#63b88b',sky:'#6fa8dc'};
+  const CHARACTER_ACCENT_NAMES = Object.keys(CHARACTER_ACCENTS);
 
   const $ = id => document.getElementById(id);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -79,11 +82,14 @@
     if(!row || typeof row !== 'object') return null; const name=cleanName(row.name); if(!name) return null;
     return makeTask(name, row.category || categoryForLegacy(name,kind), row);
   }
+  function normalizeAccent(value){ return Object.prototype.hasOwnProperty.call(CHARACTER_ACCENTS,value)?value:'gold'; }
+  function accentColor(value){ return CHARACTER_ACCENTS[normalizeAccent(value)]; }
+  function categoryIcon(category){ return CATEGORY_ICONS[category] || '✦'; }
   function normalizeProfile(input, fallback='Main Character'){
     const p = input && typeof input==='object' ? input : {};
     const daily = (Array.isArray(p.daily)?p.daily:defaultTasks('daily')).map(x=>normalizeTask(x,'daily')).filter(Boolean);
     const weekly = (Array.isArray(p.weekly)?p.weekly:defaultTasks('weekly')).map(x=>normalizeTask(x,'weekly')).filter(Boolean);
-    return {id: typeof p.id==='string'&&p.id?p.id:uid('char'), name:norm(p.name||fallback).slice(0,40)||fallback, className:norm(p.className||'').slice(0,40), avatar:norm(p.avatar||'⚔️').slice(0,4)||'⚔️', dailyDate:p.dailyDate||dayKey(), weekDate:p.weekDate||weekKey(), daily, weekly, updatedAt:p.updatedAt||nowISO()};
+    return {id: typeof p.id==='string'&&p.id?p.id:uid('char'), name:norm(p.name||fallback).slice(0,40)||fallback, className:norm(p.className||'').slice(0,40), avatar:norm(p.avatar||'⚔️').slice(0,4)||'⚔️', accent:normalizeAccent(p.accent), dailyDate:p.dailyDate||dayKey(), weekDate:p.weekDate||weekKey(), daily, weekly, updatedAt:p.updatedAt||nowISO()};
   }
   function addEliteHuntQuest(profile){
     if(profile.daily.some(t=>cleanName(t.name).toLowerCase()==='elite')) return;
@@ -105,7 +111,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -135,6 +141,7 @@
   let drag = null;
   let customMusicUrl=null, audioUnlockArmed=false, audioUnlockHandler=null;
   let sfxCtx=null;
+  let celebrationTimer=null;
   const theme=$('theme-audio');
 
   function loadApp(){
@@ -175,6 +182,10 @@
       btn.setAttribute('aria-label',eff==='dark'?'Switch to light mode':'Switch to dark mode');
       btn.title=app.settings.theme==='system'?`Using device setting (${eff})`:`Current theme: ${eff}`;
     }
+  }
+  function applyCharacterAccent(){
+    const p=active();
+    document.documentElement.style.setProperty('--character-accent',accentColor(p?.accent));
   }
   function touch(obj){ obj.updatedAt=nowISO(); app.meta.updatedAt=obj.updatedAt; app.meta.appVersion=VERSION; }
   function saveLocal(reason='Change saved', options={}){
@@ -220,10 +231,10 @@
     return tasks;
   }
   function canDrag(){ return !app.settings.finishMode && !app.settings.hideCompleted && !app.settings.completedBottom; }
-  function renderAll(){ rolloverAll(); applyTheme(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); }
+  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
-    app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.innerHTML=`<span>${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
+    app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.style.setProperty('--tab-accent',accentColor(p.accent)); b.innerHTML=`<span class="character-avatar">${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
     const p=active(); const quick=$('quick-character-select'); quick.replaceChildren(); app.profiles.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=`${x.avatar} ${x.name}`;quick.append(o)});quick.value=p.id;
   }
   function renderQuick(){
@@ -234,8 +245,10 @@
   function renderKind(kind){
     const p=active(); recordPeriod(p,kind,kind==='daily'?p.dailyDate:p.weekDate);
     const tasks=p[kind],done=tasks.filter(t=>t.done).length,total=tasks.length,pct=total?done/total*100:0;
-    setText(`${kind}-count`,`${done} / ${total}`); $(`${kind}-bar`).style.width=`${pct}%`;
-    const prog=$(`${kind}-bar`).parentElement; prog.setAttribute('aria-valuenow',String(done)); prog.setAttribute('aria-valuemax',String(Math.max(1,total))); prog.setAttribute('aria-valuetext',`${done} of ${total} quests done`);
+    const pctRounded=Math.round(pct);
+    setText(`${kind}-count`,`${done} / ${total}`);setText(`${kind}-percent`,`${pctRounded}%`);$(`${kind}-bar`).style.width=`${pct}%`;
+    const prog=$(`${kind}-bar`).parentElement; prog.setAttribute('aria-valuenow',String(done)); prog.setAttribute('aria-valuemax',String(Math.max(1,total))); prog.setAttribute('aria-valuetext',`${done} of ${total} quests done`);prog.classList.toggle('complete',total>0&&done===total);
+    $(`${kind}-card`)?.classList.toggle('complete-card',total>0&&done===total);
     if(kind==='daily')setText('daily-date',`${formatDateKey(p.dailyDate)} · reset 5:00 AM UTC+7`); else setText('weekly-date',`Week of ${formatDateKey(p.weekDate,{month:'short',day:'numeric',year:'numeric'})} · Monday reset`);
     const body=$(`${kind}-body`), collapsed=!!app.settings.collapsedSections[kind]; body.hidden=collapsed; const cb=document.querySelector(`[data-collapse="${kind}"]`); cb.textContent=collapsed?'Expand':'Collapse'; cb.setAttribute('aria-expanded',String(!collapsed));
     const root=$(`${kind}-groups`); root.replaceChildren(); const shown=displayTasks(p,kind), byCat=new Map();
@@ -248,7 +261,8 @@
   function renderCategory(kind,category,tasks){
     const block=document.createElement('section');block.className='category-block';block.dataset.category=category;
     const head=document.createElement('div');head.className='category-head'; const collapsed=!!app.settings.collapsedCategories[kind]?.[category];
-    head.innerHTML=`<div class="category-title"><strong>${escapeHTML(category)}</strong><span>${tasks.length}</span></div>`;
+    const categoryAll=active()[kind].filter(t=>t.category===category),categoryDone=categoryAll.filter(t=>t.done).length;
+    head.innerHTML=`<div class="category-title"><span class="category-icon" aria-hidden="true">${categoryIcon(category)}</span><strong>${escapeHTML(category)}</strong><span class="category-progress">${categoryDone}/${categoryAll.length}</span></div>`;
     const btn=document.createElement('button');btn.type='button';btn.textContent=collapsed?'Expand':'Collapse';btn.addEventListener('click',()=>{app.settings.collapsedCategories[kind][category]=!collapsed;saveLocal('Category view changed');renderKind(kind)});head.append(btn);block.append(head);
     const list=document.createElement('ul');list.className='task-list';list.dataset.kind=kind;list.dataset.category=category;list.hidden=collapsed;
     tasks.forEach(t=>list.append(renderTask(kind,t))); block.append(list); return block;
@@ -266,7 +280,15 @@
     const fav=document.createElement('button');fav.type='button';fav.className='favorite-btn';fav.textContent=task.favorite?'★':'☆';fav.setAttribute('aria-pressed',String(task.favorite));fav.title=task.favorite?'Remove favorite':'Favorite quest';fav.addEventListener('click',()=>{task.favorite=!task.favorite;touch(task);saveLocal('Favorite changed');renderKind(kind)});row.append(fav);
     const edit=document.createElement('button');edit.type='button';edit.className='edit-task';edit.textContent=task.note?'Notes · Edit':'Edit';edit.addEventListener('click',()=>openTaskDialog(kind,task.id));row.append(edit);return row;
   }
-  function checkCompletion(kind){ const p=active(),tasks=p[kind]; if(tasks.length&&tasks.every(t=>t.done)){toast(`${kind==='daily'?'Daily':'Weekly'} checklist complete!`,'good');createSnapshot(`${kind} completed`);} }
+  function celebrateCompletion(kind){
+    const p=active(),period=kind==='daily'?p.dailyDate:p.weekDate,key=`celebration:${p.id}:${kind}:${period}`;
+    try{if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1')}catch(_){}
+    const root=$('completion-celebration');if(!root)return;
+    setText('celebration-title',kind==='daily'?'Daily Quests Complete!':'Weekly Quests Complete!');
+    setText('celebration-copy',kind==='daily'?'Great work, adventurer! See you after reset.':'Amazing work! Your weekly checklist is complete.');
+    root.hidden=false;root.classList.remove('show');void root.offsetWidth;root.classList.add('show');clearTimeout(celebrationTimer);celebrationTimer=setTimeout(()=>{root.classList.remove('show');setTimeout(()=>{root.hidden=true},220)},2600);
+  }
+  function checkCompletion(kind){ const p=active(),tasks=p[kind]; if(tasks.length&&tasks.every(t=>t.done)){toast(`${kind==='daily'?'Daily':'Weekly'} checklist complete!`,'good');celebrateCompletion(kind);createSnapshot(`${kind} completed`);} }
   function escapeHTML(v){ const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML; }
   function setPressed(id,v){ const el=$(id);el?.setAttribute('aria-pressed',String(!!v)); }
 
@@ -284,8 +306,8 @@
   function saveTaskFromDialog(){ const kind=$('task-kind').value,id=$('task-id').value,name=cleanName($('task-name').value);if(!name){toast('Enter a quest name.','bad');return false;}const p=active();let task=id?p[kind].find(t=>t.id===id):null;if(!task){task=makeTask(name,$('task-category').value);p[kind].push(task)}task.name=name;task.category=$('task-category').value;task.note=norm($('task-note').value).slice(0,500);task.priority=clamp(Number($('task-priority').value),0,3);task.favorite=$('task-favorite').checked;touch(task);saveLocal('Quest edited');renderKind(kind);return true; }
   function deleteTaskFromDialog(){ const kind=$('task-kind').value,id=$('task-id').value;if(!id)return;if(!confirm('Delete this quest?'))return;createSnapshot('Before deleting quest');active()[kind]=active()[kind].filter(t=>t.id!==id);saveLocal('Quest deleted');$('task-dialog').close();renderKind(kind);renderQuick(); }
 
-  function openCharacterDialog(id=null){ const p=id?app.profiles.find(x=>x.id===id):null;$('character-id').value=p?.id||'';$('character-dialog-title').textContent=p?'Edit character':'Add character';$('character-name').value=p?.name||'';$('character-class').value=p?.className||'';$('character-avatar').value=p?.avatar||'⚔️';$('character-copy-quests').checked=!p;$('character-copy-wrap').hidden=!!p;$('character-delete').hidden=!p||app.profiles.length===1;$('character-dialog').showModal();setTimeout(()=>$('character-name').focus(),40); }
-  function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
+  function openCharacterDialog(id=null){ const p=id?app.profiles.find(x=>x.id===id):null;$('character-id').value=p?.id||'';$('character-dialog-title').textContent=p?'Edit character':'Add character';$('character-name').value=p?.name||'';$('character-class').value=p?.className||'';$('character-avatar').value=p?.avatar||'⚔️';$('character-accent').value=p?.accent||CHARACTER_ACCENT_NAMES[app.profiles.length%CHARACTER_ACCENT_NAMES.length]||'gold';$('character-copy-quests').checked=!p;$('character-copy-wrap').hidden=!!p;$('character-delete').hidden=!p||app.profiles.length===1;$('character-dialog').showModal();setTimeout(()=>$('character-name').focus(),40); }
+  function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40),accent=normalizeAccent($('character-accent').value);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;p.accent=accent;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
   function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data?`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
   function copySetup(){ if(app.profiles.length<2){toast('Add another character first.');return;}const targets=app.profiles.filter(p=>p.id!==app.activeProfileId);const msg=targets.map((p,i)=>`${i+1}. ${p.name}`).join('\n');const pick=prompt(`Copy quest setup FROM which character?\n\n${msg}`);if(pick===null)return;const src=targets[Number(pick)-1];if(!src){toast('That selection was not valid.','bad');return;}if(!confirm(`Replace ${active().name}'s quest setup with ${src.name}'s setup? Current completion checks will be cleared.`))return;createSnapshot('Before copying character setup');active().daily=src.daily.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));active().weekly=src.weekly.map(t=>({...t,id:uid('q'),done:false,completedAt:null,updatedAt:nowISO()}));saveLocal('Character quest setup copied');renderAll();toast(`Copied ${src.name}'s quest setup.`,'good'); }
 
@@ -327,7 +349,12 @@
     else if(!cloud){pill.textContent='Ready';pill.className='status-pill good';txt.textContent='Cloud service is ready. Create a private pairing code on this device, then join with that code on your PC or phone.';setText('cloud-mini','Cloud ready');}
     else if(cloudAuthInvalid){pill.textContent='Re-pair needed';pill.className='status-pill bad';txt.textContent='This device’s cloud pairing code is no longer valid. Disconnect this device, then join again with the current pairing code.';setText('cloud-mini','Re-pair needed');}
     else{pill.textContent='Connected';pill.className='status-pill good';txt.textContent=`Paired as ${cloud.roomId}. Changes sync automatically while online.`;setText('cloud-mini','Cloud connected');}
-    ['cloud-create','cloud-join'].forEach(id=>$(id).disabled=!cloudConfigured||!!cloud);['cloud-sync-now','cloud-copy-code','cloud-disconnect','cloud-rotate','cloud-revoke'].forEach(id=>{if($(id))$(id).disabled=!cloudConfigured||!cloud});
+    const paired=!!cloud,usable=cloudConfigured&&paired&&!cloudAuthInvalid;
+    ['cloud-create','cloud-join'].forEach(id=>{const el=$(id);if(el){el.disabled=!cloudConfigured||paired;el.hidden=!cloudConfigured||paired}});
+    ['cloud-sync-now','cloud-copy-code'].forEach(id=>{const el=$(id);if(el){el.disabled=!usable;el.hidden=!usable}});
+    ['cloud-disconnect','cloud-rotate','cloud-revoke'].forEach(id=>{if($(id))$(id).disabled=!cloudConfigured||!paired});
+    if($('cloud-manage'))$('cloud-manage').hidden=!cloudConfigured||!paired;
+    const cc=$('connection-card');if(cc){cc.dataset.cloud=!cloudConfigured?'local':cloudAuthInvalid?'warning':paired?'connected':'ready';}
   }
   async function cloudCreate(){
     if(!cloudConfigured)return;
@@ -449,7 +476,7 @@
     }
   }
 
-  function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
+  function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));const resetCard=$('daily-reset-card');if(resetCard){resetCard.classList.toggle('reset-near',ms<=2*3600000);resetCard.classList.toggle('reset-urgent',ms<=30*60000)}const connectionCard=$('connection-card');if(connectionCard){connectionCard.classList.toggle('is-online',navigator.onLine);connectionCard.classList.toggle('is-offline',!navigator.onLine)}reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
 
   function bindUI(){
     document.addEventListener('selectstart',e=>{ if(drag) e.preventDefault(); },{passive:false});
@@ -466,6 +493,9 @@
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
+    const jumpTo=id=>{if($('settings-dialog')?.open)$('settings-dialog').close();requestAnimationFrame(()=>$(`${id}`)?.scrollIntoView({behavior:'smooth',block:'start'}))};
+    $('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
+    $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
     const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)app.settings.completedBottom=false;if(key==='completedBottom'&&e.target.checked)app.settings.hideCompleted=false;if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
