@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.1.0';
+  const VERSION = '5.1.1';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
@@ -316,6 +316,8 @@
   function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
 
   function bindUI(){
+    $$('[data-dialog-close]').forEach(btn=>btn.addEventListener('click',()=>{ const dialog=btn.closest('dialog'); if(dialog?.open) dialog.close('cancel'); }));
+    $$('.modal').forEach(dialog=>dialog.addEventListener('cancel',e=>{ e.preventDefault(); dialog.close('cancel'); }));
     $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted)app.settings.completedBottom=false;saveLocal('Filter changed');renderAll()});
     $('toggle-finish-mode').addEventListener('click',()=>{app.settings.finishMode=!app.settings.finishMode;saveLocal('Finish mode changed');renderAll()});
     $('quick-character-select').addEventListener('change',e=>{app.activeProfileId=e.target.value;saveLocal('Character switched');renderAll()});
