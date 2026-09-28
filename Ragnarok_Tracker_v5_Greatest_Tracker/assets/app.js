@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.1.2';
+  const VERSION = '5.1.3';
   const STORAGE_KEY = 'rtnw-tracker-v5';
   const LEGACY_KEYS = ['ragnarok-new-world-checklist-v3', 'ragnarok-new-world-checklist-v1'];
   const SNAPSHOT_KEY = 'rtnw-tracker-v5-snapshots';
@@ -14,7 +14,7 @@
   const CLOUD_POLL_MS = 15000;
   const DEFAULT_CATEGORIES = ['General', 'Guild', 'PvP', 'Hunt', 'Instance', 'Farming', 'Exploration', 'Social', 'Pets', 'Event'];
   const DEFAULT_DAILY = [
-    ['Quest Board','General'],['Guild Dailies','Guild'],['Cat Cargo','General'],['Peer Arena','PvP'],['MVP','Hunt'],['Mini','Hunt'],
+    ['Quest Board','General'],['Guild Dailies','Guild'],['Cat Cargo','General'],['Peer Arena','PvP'],['MVP','Hunt'],['Mini','Hunt'],['Elite','Hunt'],
     ['Monster Extermination','Hunt'],['Healthy Combat','General'],['Card Pity','Farming'],['Lord Chest','Exploration'],
     ['Assist and Hand in Hand','Social'],['Catch Pets','Pets'],['Special Events','Event']
   ];
@@ -80,6 +80,17 @@
     const weekly = (Array.isArray(p.weekly)?p.weekly:defaultTasks('weekly')).map(x=>normalizeTask(x,'weekly')).filter(Boolean);
     return {id: typeof p.id==='string'&&p.id?p.id:uid('char'), name:norm(p.name||fallback).slice(0,40)||fallback, className:norm(p.className||'').slice(0,40), avatar:norm(p.avatar||'⚔️').slice(0,4)||'⚔️', dailyDate:p.dailyDate||dayKey(), weekDate:p.weekDate||weekKey(), daily, weekly, updatedAt:p.updatedAt||nowISO()};
   }
+  function addEliteHuntQuest(profile){
+    if(profile.daily.some(t=>cleanName(t.name).toLowerCase()==='elite')) return;
+    const elite=makeTask('Elite','Hunt');
+    let at=profile.daily.findIndex(t=>cleanName(t.name).toLowerCase()==='mini');
+    if(at<0) at=profile.daily.findIndex(t=>cleanName(t.name).toLowerCase()==='mvp');
+    if(at<0){
+      const huntIndexes=profile.daily.map((t,i)=>t.category==='Hunt'?i:-1).filter(i=>i>=0);
+      at=huntIndexes.length?huntIndexes[huntIndexes.length-1]:profile.daily.length-1;
+    }
+    profile.daily.splice(at+1,0,elite);
+  }
   function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2}; }
   function normalizeApp(input){
     const raw = input && typeof input==='object' ? input : {};
@@ -88,6 +99,8 @@
     else if(Array.isArray(raw.daily)||Array.isArray(raw.weekly)) profiles=[normalizeProfile(raw)];
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
+    const savedVersion=String(raw.meta?.appVersion||'');
+    if(savedVersion!=='5.1.3') profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
