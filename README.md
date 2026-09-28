@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.1.3
+# Ragnarok: The New World Tracker v5.1.4
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -29,7 +29,27 @@ Choose **Device setting**, **Light mode**, or **Dark mode** in Settings. A quick
 
 The app reads the previous local-storage keys (`ragnarok-new-world-checklist-v3` and v1) and migrates characters, quest checks, custom quests, and quest ordering into the v5 state model. Existing `Monster Etermination` data is corrected to `Monster Extermination`.
 
-Existing profiles upgrading to v5.1.3 also receive **Elite** once under the **Hunt** daily category if it is missing, without resetting the rest of their quest progress.
+Existing profiles upgrading from releases before v5.1.3 receive **Elite** once under the **Hunt** daily category if it is missing, without resetting the rest of their quest progress.
+
+## Creator
+
+Ragnarok: The New World Tracker is an unofficial fan-made community project created by **FatherJunJun**.
+
+The tracker was created to help players manage daily quests, weekly activities, multiple characters, resets, notes, priorities, and progress across devices.
+
+## Support the Tracker
+
+The tracker is free to use.
+
+If you enjoy the project and would like to support future updates and maintenance, you can support FatherJunJun through Buy Me a Coffee:
+
+**https://buymeacoffee.com/FatherJunJun**
+
+Support is completely optional and does not unlock or restrict tracker functionality. Payments are handled by Buy Me a Coffee; the tracker does not collect payment-card information.
+
+## Disclaimer
+
+This is an unofficial fan-made community project and is not affiliated with or endorsed by the game publisher or developer.
 
 ## Cloud sync setup (one-time)
 
@@ -82,6 +102,13 @@ The app attempts autoplay when the user preference is enabled. Browsers may bloc
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.1.4 — FatherJunJun Branding + Support
+
+- Added FatherJunJun creator attribution across the tracker.
+- Added Buy Me a Coffee support, QR support modal, and sharing controls.
+- Added About the Creator and fan-made project disclaimer content.
+- Updated page/PWA metadata and service-worker cache for v5.1.4.
 
 ### v5.1.3 — Hunt update
 
