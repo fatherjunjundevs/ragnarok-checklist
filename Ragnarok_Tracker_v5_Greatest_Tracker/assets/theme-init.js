@@ -166,4 +166,260 @@
   }
 
   installFluidDailyGrid();
+
+  /*
+   * Mobile Navigation Polish
+   *
+   * app.js intentionally tracks the visible section with IntersectionObserver.
+   * During a programmatic smooth-scroll, however, each section passed on the
+   * way can briefly become "active". This hotfix owns mobile nav taps in the
+   * capture phase, visually locks the requested destination while scrolling,
+   * then resumes deterministic scroll tracking after the destination settles.
+   *
+   * It is active only at <=720px, matching the existing mobile nav breakpoint.
+   */
+  const mobileNavStyle = document.createElement('style');
+  mobileNavStyle.id = 'rtnw-mobile-nav-polish-style';
+  mobileNavStyle.textContent = `
+    @media (max-width: 720px) {
+      .mobile-nav button {
+        transition: background-color .14s ease, color .14s ease, box-shadow .14s ease;
+      }
+
+      body.rtnw-mobile-nav-locked .mobile-nav button.active {
+        background: transparent;
+        color: #dce8f1;
+        box-shadow: none;
+      }
+
+      body.rtnw-mobile-nav-locked .mobile-nav button.active small {
+        color: inherit;
+      }
+
+      body.rtnw-mobile-nav-locked .mobile-nav button.rtnw-nav-locked-active {
+        background: linear-gradient(180deg,#f0d18f,#c89e4d);
+        color: #1f3148;
+        box-shadow: 0 5px 15px #0004;
+      }
+
+      body.rtnw-mobile-nav-locked .mobile-nav button.rtnw-nav-locked-active small {
+        color: #1f3148;
+      }
+
+      .journal-fab {
+        transition: opacity .16s ease, transform .16s ease;
+      }
+
+      body.rtnw-mobile-nav-locked .journal-fab {
+        opacity: .18;
+        transform: translateY(8px);
+        pointer-events: none;
+      }
+
+      #daily-card,
+      #weekly-card,
+      #journal-card,
+      #character-dock {
+        scroll-margin-top: 86px;
+      }
+    }
+  `;
+  document.head.append(mobileNavStyle);
+
+  function installMobileNavPolish() {
+    const nav = document.querySelector('.mobile-nav');
+    if (!nav) return;
+
+    const MOBILE_QUERY = '(max-width: 720px)';
+    const mobileQuery = window.matchMedia?.(MOBILE_QUERY);
+    const sectionIds = ['daily-card', 'weekly-card', 'journal-card', 'character-dock'];
+    let lockedTarget = '';
+    let settleFrame = 0;
+    let syncFrame = 0;
+    let releaseToken = 0;
+
+    const isMobile = () =>
+      mobileQuery ? mobileQuery.matches : window.innerWidth <= 720;
+
+    const buttons = () => [...nav.querySelectorAll('[data-mobile-target]')];
+
+    const markDom = id => {
+      if (!id) return;
+      buttons().forEach(button => {
+        button.classList.toggle('active', button.dataset.mobileTarget === id);
+      });
+    };
+
+    const stickyOffset = () => {
+      const quickbar = document.querySelector('.quickbar');
+      const height = quickbar?.getBoundingClientRect().height || 0;
+      // Existing quickbar uses top:8px. Keep a little breathing room below it.
+      return Math.max(20, 8 + height + 12);
+    };
+
+    const viewportSection = () => {
+      const sections = sectionIds
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+
+      if (!sections.length) return '';
+
+      // Use one stable reading line instead of intersection ratios. This makes
+      // manual scrolling feel calmer around boundaries between short sections.
+      const anchor = Math.min(
+        Math.max(96, window.innerHeight * 0.22),
+        190
+      );
+
+      const containing = sections.find(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.top <= anchor && rect.bottom > anchor;
+      });
+      if (containing) return containing.id;
+
+      let best = sections[0];
+      let bestDistance = Infinity;
+      sections.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const distance = Math.abs(rect.top - anchor);
+        if (distance < bestDistance) {
+          best = el;
+          bestDistance = distance;
+        }
+      });
+      return best?.id || '';
+    };
+
+    const syncFromViewport = () => {
+      syncFrame = 0;
+      if (!isMobile() || lockedTarget) return;
+      const id = viewportSection();
+      if (id) markDom(id);
+    };
+
+    const scheduleSync = () => {
+      if (syncFrame) return;
+      syncFrame = requestAnimationFrame(syncFromViewport);
+    };
+
+    const endLock = token => {
+      if (token !== releaseToken) return;
+      lockedTarget = '';
+      document.body.classList.remove('rtnw-mobile-nav-locked');
+      buttons().forEach(button => button.classList.remove('rtnw-nav-locked-active'));
+      scheduleSync();
+    };
+
+    const watchForSettle = (targetId, token) => {
+      cancelAnimationFrame(settleFrame);
+      let lastY = window.scrollY;
+      let stableFrames = 0;
+      const started = performance.now();
+
+      const step = () => {
+        if (token !== releaseToken || lockedTarget !== targetId) return;
+
+        const y = window.scrollY;
+        if (Math.abs(y - lastY) < 0.5) stableFrames += 1;
+        else stableFrames = 0;
+        lastY = y;
+
+        const elapsed = performance.now() - started;
+        if ((elapsed > 220 && stableFrames >= 5) || elapsed > 1600) {
+          // Let the browser deliver any final intersection callbacks while the
+          // visual lock is still active, then hand control back to scroll sync.
+          setTimeout(() => endLock(token), 80);
+          return;
+        }
+
+        settleFrame = requestAnimationFrame(step);
+      };
+
+      settleFrame = requestAnimationFrame(step);
+    };
+
+    const navigate = id => {
+      if (!isMobile()) return;
+
+      const target = document.getElementById(id);
+      if (!target) return;
+
+      releaseToken += 1;
+      const token = releaseToken;
+      lockedTarget = id;
+
+      document.body.classList.add('rtnw-mobile-nav-locked');
+      buttons().forEach(button => {
+        const selected = button.dataset.mobileTarget === id;
+        button.classList.toggle('rtnw-nav-locked-active', selected);
+        // Keep the semantic/current DOM state aligned with the requested tab.
+        button.classList.toggle('active', selected);
+      });
+
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const top = Math.max(
+        0,
+        window.scrollY + target.getBoundingClientRect().top - stickyOffset()
+      );
+
+      window.scrollTo({
+        top,
+        behavior: reducedMotion ? 'auto' : 'smooth'
+      });
+
+      if (reducedMotion) {
+        setTimeout(() => endLock(token), 40);
+      } else {
+        watchForSettle(id, token);
+      }
+    };
+
+    // Capture-phase ownership prevents app.js's two existing mobile button
+    // listeners from starting a second scroll and from immediately fighting
+    // over the active highlight. "More" is untouched because it has no
+    // data-mobile-target attribute.
+    nav.addEventListener('click', event => {
+      const button = event.target.closest?.('[data-mobile-target]');
+      if (!button || !nav.contains(button) || !isMobile()) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      navigate(button.dataset.mobileTarget);
+    }, true);
+
+    window.addEventListener('scroll', scheduleSync, { passive: true });
+    window.addEventListener('resize', scheduleSync, { passive: true });
+
+    // If the user manually touches the page while a smooth navigation scroll
+    // is running, stop visually locking the previous destination.
+    document.addEventListener('touchstart', event => {
+      if (!lockedTarget || event.target.closest?.('.mobile-nav')) return;
+      releaseToken += 1;
+      lockedTarget = '';
+      document.body.classList.remove('rtnw-mobile-nav-locked');
+      buttons().forEach(button => button.classList.remove('rtnw-nav-locked-active'));
+      scheduleSync();
+    }, { passive: true, capture: true });
+
+    if (mobileQuery?.addEventListener) {
+      mobileQuery.addEventListener('change', () => {
+        if (!isMobile()) {
+          releaseToken += 1;
+          lockedTarget = '';
+          document.body.classList.remove('rtnw-mobile-nav-locked');
+          buttons().forEach(button => button.classList.remove('rtnw-nav-locked-active'));
+        } else {
+          scheduleSync();
+        }
+      });
+    }
+
+    scheduleSync();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installMobileNavPolish, { once: true });
+  } else {
+    installMobileNavPolish();
+  }
 })();
