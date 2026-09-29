@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.4.4
+# Ragnarok: The New World Tracker v5.5.0
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -28,6 +28,8 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 22. All-character progress overview for quickly spotting unfinished dailies and weeklies.
 23. Short-session planner that suggests unfinished quests for 15–120 minute play windows using priorities, favorites, and editable duration estimates.
 24. Optional quest guidance for prerequisites, location, rewards, and notes behind an expandable details control.
+25. Persistent Adventure Journal for build needs, goals/achievements, Trade House shopping, dream items, quick capture, progress targets, and accomplished items.
+26. Journal items can be pinned into the Short Session Planner and optionally assigned to a specific character.
 
 ## Appearance
 
@@ -40,6 +42,8 @@ The app reads the previous local-storage keys (`ragnarok-new-world-checklist-v3`
 Existing profiles upgrading from releases before v5.1.3 receive **Elite** once under the **Hunt** daily category if it is missing, without resetting the rest of their quest progress.
 
 v5.4 automatically gives existing quests a target of **1**, preserves completed/unfinished state as counter progress, uses a default **10-minute** duration estimate, and leaves the new guidance fields blank until the player adds them. No Supabase schema migration is required. After a cloud room has been updated by v5.4, older tracker clients are prevented from overwriting the newer quest fields; update all paired devices when the v5.4 service-worker prompt appears.
+
+v5.5 adds an empty **Adventure Journal** to existing tracker data. Journal items are part of the same local/cloud tracker state, do not reset with daily or weekly server periods, and require no Supabase schema migration. Once a cloud room is updated by v5.5, older clients are prevented from overwriting the newer state.
 
 ## Creator
 
@@ -131,6 +135,14 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.5.0 — Adventure Journal
+
+- Added a persistent Adventure Journal for build needs, goals/achievements, Trade House targets, dream items, and quick notes.
+- Added Quick Capture Inbox, filters, progress targets, target price/budget, notes, character assignment, priorities, and Accomplished history.
+- Added Pin for today so Journal items can participate in the Short Session Planner.
+- Added a Journal destination to mobile navigation and a floating Quick Capture control.
+- Extended strict cloud validation for Journal entries without requiring a Supabase schema change.
 
 ### v5.4.4 — Silky completed grouping
 
