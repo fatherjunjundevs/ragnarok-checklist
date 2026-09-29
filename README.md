@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.5.0
+# Ragnarok: The New World Tracker v5.6.0
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -11,7 +11,7 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 5. Quest categories with custom categories and drag-to-reorder / drag-between-category support.
 6. Optional reset reminders using browser notifications while the app is active/PWA-supported.
 7. Daily and weekly completion history with a 35-day calendar and streak counter.
-8. Responsive desktop two-column dashboard and mobile single-column layout.
+8. Responsive desktop efficiency layout that uses wider screens better while preserving a single-column phone experience.
 9. Service-worker update banner with “Update now”.
 10. Separate HTML/CSS/JS/music/art assets for smaller HTML and easier maintenance.
 11. Automatic local snapshots plus restore, JSON export/import, and manual sync-code fallback.
@@ -30,6 +30,8 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 24. Optional quest guidance for prerequisites, location, rewards, and notes behind an expandable details control.
 25. Persistent Adventure Journal for build needs, goals/achievements, Trade House shopping, dream items, quick capture, progress targets, and accomplished items.
 26. Journal items can be pinned into the Short Session Planner and optionally assigned to a specific character.
+27. Responsive two-column Daily category layout, sticky category jump bar, automatic completed-category collapsing, and stronger desktop Compact mode.
+28. Private in-app feedback for bugs, suggestions, and general feedback with safe diagnostics and server-side spam protection.
 
 ## Appearance
 
@@ -44,6 +46,8 @@ Existing profiles upgrading from releases before v5.1.3 receive **Elite** once u
 v5.4 automatically gives existing quests a target of **1**, preserves completed/unfinished state as counter progress, uses a default **10-minute** duration estimate, and leaves the new guidance fields blank until the player adds them. No Supabase schema migration is required. After a cloud room has been updated by v5.4, older tracker clients are prevented from overwriting the newer quest fields; update all paired devices when the v5.4 service-worker prompt appears.
 
 v5.5 adds an empty **Adventure Journal** to existing tracker data. Journal items are part of the same local/cloud tracker state, do not reset with daily or weekly server periods, and require no Supabase schema migration. Once a cloud room is updated by v5.5, older clients are prevented from overwriting the newer state.
+
+v5.6 adds responsive desktop-efficiency preferences to tracker settings and a private feedback channel. Feedback is stored separately from tracker state in the server-only `tracker_feedback` table. Other players cannot browse submissions, and the feedback form does not automatically attach character names, quest/Journals, notes, pairing codes, or tracker state.
 
 ## Creator
 
@@ -87,7 +91,7 @@ The pairing credential is stored separately in browser localStorage so automatic
 The front-end and API are already included. To turn cloud sync from “Setup needed” to “Ready”:
 
 1. Create/connect a Supabase project.
-2. Run `supabase_setup.sql` in the Supabase SQL editor.
+2. Run `supabase_setup.sql`, then `supabase_feedback_v5_6.sql`, in the Supabase SQL editor.
 3. In Vercel → project → Settings → Environment Variables, add:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY` (mark sensitive; never put it in browser code)
@@ -111,6 +115,7 @@ Files that must be present:
 - `assets/prontera.mp3`
 - `api/health.js`
 - `api/sync.js`
+- `api/feedback.js`
 - `privacy.html`
 - `icon-192.png`
 - `icon-512.png`
@@ -119,6 +124,7 @@ Files that must be present:
 - `vercel.json`
 - `package.json`
 - `supabase_setup.sql`
+- `supabase_feedback_v5_6.sql`
 
 ## Reset rules
 
@@ -135,6 +141,15 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.6.0 — Desktop Efficiency & Private Feedback
+
+- Gives Dailies more horizontal room on desktop and uses a responsive two-column category layout only when the browser is wide enough.
+- Adds a sticky Daily category jump bar with remaining counts and automatic collapsing of completed categories.
+- Makes Compact mode meaningfully denser on desktop while keeping mobile touch targets comfortable.
+- Adds private Bug / Suggestion / General Feedback submission with optional contact information and safe device diagnostics.
+- Feedback submissions are write-only from the public app: users cannot browse other players' reports. The Supabase feedback table has RLS enabled with no public policies.
+- Adds quiet spam protection using same-origin checks, strict payload validation, a honeypot, database-backed rate limits, and duplicate throttling.
 
 ### v5.5.0 — Adventure Journal
 
