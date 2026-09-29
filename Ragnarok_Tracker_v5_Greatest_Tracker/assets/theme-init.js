@@ -422,4 +422,354 @@
   } else {
     installMobileNavPolish();
   }
+  /*
+   * Vercel Analytics + Speed Insights
+   *
+   * Loads Vercel's first-party measurement scripts on the public tracker and
+   * emits a small set of privacy-safe engagement events. No character names,
+   * quest names, Journal text, notes, contacts, pairing codes, or tracker state
+   * are included in custom event data.
+   */
+  function installVercelInsights() {
+    window.va = window.va || function () {
+      (window.vaq = window.vaq || []).push(arguments);
+    };
+    window.si = window.si || function () {
+      (window.siq = window.siq || []).push(arguments);
+    };
+
+    const inject = (src, key) => {
+      if (document.querySelector(`script[data-rtnw-insights="${key}"]`)) return;
+      const script = document.createElement('script');
+      script.defer = true;
+      script.src = src;
+      script.dataset.rtnwInsights = key;
+      document.head.append(script);
+    };
+
+    inject('/_vercel/insights/script.js', 'analytics');
+    inject('/_vercel/speed-insights/script.js', 'speed');
+
+    const track = (name, data = {}) => {
+      try {
+        if (typeof window.va === 'function') {
+          window.va('event', { name, data });
+        }
+      } catch (_) {}
+    };
+
+    // Track only successful server-side actions. We inspect only the action
+    // category fields needed for aggregate analytics and never send form text.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async function (input, init = {}) {
+      let pendingEvent = null;
+
+      try {
+        const rawUrl = input instanceof Request ? input.url : String(input || '');
+        const url = new URL(rawUrl, location.href);
+        const method = String(
+          init.method || (input instanceof Request ? input.method : 'GET')
+        ).toUpperCase();
+
+        if (url.origin === location.origin && method === 'POST') {
+          if (url.pathname === '/api/feedback' && typeof init.body === 'string') {
+            const body = JSON.parse(init.body);
+            const type = ['bug', 'suggestion', 'general'].includes(body?.type)
+              ? body.type
+              : 'other';
+            const area = [
+              'dailies', 'weeklies', 'journal', 'characters',
+              'layout', 'mobile', 'cloud', 'other'
+            ].includes(body?.area) ? body.area : 'other';
+
+            pendingEvent = {
+              name: 'feedback_submitted',
+              data: { type, area }
+            };
+          }
+
+          if (url.pathname === '/api/sync' && typeof init.body === 'string') {
+            const body = JSON.parse(init.body);
+            if (body?.action === 'create') {
+              pendingEvent = {
+                name: 'cloud_sync_connected',
+                data: { method: 'create' }
+              };
+            }
+          }
+        }
+      } catch (_) {}
+
+      const response = await nativeFetch(input, init);
+
+      if (response?.ok && pendingEvent) {
+        track(pendingEvent.name, pendingEvent.data);
+      }
+
+      return response;
+    };
+
+    const isIOS = () =>
+      /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    const questKind = element => {
+      const row = element?.closest?.('.task-row');
+      return row?.dataset?.kind === 'weekly' ? 'weekly' : 'daily';
+    };
+
+    const installEngagementEvents = () => {
+      const actionState = new WeakMap();
+
+      // Capture values before app.js handles a click. The bubble-phase handler
+      // can then tell whether the action actually completed.
+      document.addEventListener('click', event => {
+        const target = event.target.closest?.('button, a');
+        if (!target) return;
+
+        if (target.id === 'journal-quick-add') {
+          actionState.set(target, {
+            kind: 'journal-quick',
+            hadValue: !!document.getElementById('journal-quick-input')?.value.trim()
+          });
+        } else if (target.id === 'journal-quick-dialog-save') {
+          actionState.set(target, {
+            kind: 'journal-dialog-quick',
+            hadValue: !!document.getElementById('journal-quick-dialog-input')?.value.trim()
+          });
+        } else if (target.id === 'journal-save') {
+          actionState.set(target, {
+            kind: 'journal-detailed',
+            isNew: !document.getElementById('journal-id')?.value,
+            hadValue: !!document.getElementById('journal-title')?.value.trim(),
+            type: document.getElementById('journal-type')?.value || 'inbox'
+          });
+        } else if (target.id === 'character-save') {
+          actionState.set(target, {
+            kind: 'character',
+            isNew: !document.getElementById('character-id')?.value,
+            hadValue: !!document.getElementById('character-name')?.value.trim(),
+            copiedSetup: !!document.getElementById('character-copy-quests')?.checked
+          });
+        } else if (target.classList?.contains('task-name-hit')) {
+          actionState.set(target, {
+            kind: 'quest-name',
+            completing: String(target.getAttribute('aria-label') || '').startsWith('Complete'),
+            questKind: questKind(target)
+          });
+        } else if (
+          target.classList?.contains('counter-btn') &&
+          String(target.textContent || '').includes('＋')
+        ) {
+          const row = target.closest('.task-row');
+          const text = row?.querySelector('.counter-value')?.textContent || '';
+          const match = text.match(/(\d+)\s*\/\s*(\d+)/);
+          if (match) {
+            const current = Number(match[1]);
+            const total = Number(match[2]);
+            if (current + 1 >= total) {
+              setTimeout(() => {
+                track('quest_completed', {
+                  kind: row?.dataset?.kind === 'weekly' ? 'weekly' : 'daily'
+                });
+              }, 0);
+            }
+          }
+        } else if (target.id === 'task-save') {
+          const id = document.getElementById('task-id')?.value || '';
+          const current = Number(document.getElementById('task-progress')?.value || 0);
+          const total = Math.max(
+            1,
+            Number(document.getElementById('task-target')?.value || 1)
+          );
+          const selector = id && window.CSS?.escape
+            ? `[data-task-id="${CSS.escape(id)}"] .task-check input`
+            : '';
+          const wasDone = selector
+            ? !!document.querySelector(selector)?.checked
+            : false;
+
+          actionState.set(target, {
+            kind: 'task-save',
+            completing: !!id && !wasDone && current >= total,
+            questKind: document.getElementById('task-kind')?.value === 'weekly'
+              ? 'weekly'
+              : 'daily'
+          });
+        }
+      }, true);
+
+      document.addEventListener('click', event => {
+        const target = event.target.closest?.('button, a');
+        if (!target) return;
+
+        if ([
+          'open-support',
+          'support-card-qr',
+          'footer-support',
+          'settings-support'
+        ].includes(target.id)) {
+          track('support_clicked');
+        }
+
+        if (
+          target.tagName === 'A' &&
+          /buymeacoffee\.com\/FatherJunJun/i.test(target.href || '')
+        ) {
+          track('support_outbound_clicked');
+        }
+
+        if (['share-tracker', 'settings-share'].includes(target.id)) {
+          track('tracker_share_clicked');
+        }
+
+        if (target.id === 'install-app') {
+          track('install_app_clicked', {
+            method: isIOS() ? 'ios_instructions' : 'browser'
+          });
+        }
+
+        const state = actionState.get(target);
+        if (!state) return;
+        actionState.delete(target);
+
+        if (state.kind === 'journal-quick') {
+          if (
+            state.hadValue &&
+            !document.getElementById('journal-quick-input')?.value
+          ) {
+            track('journal_item_added', {
+              method: 'quick',
+              type: 'inbox'
+            });
+          }
+        }
+
+        if (state.kind === 'journal-dialog-quick') {
+          setTimeout(() => {
+            const dialog = document.getElementById('journal-quick-dialog');
+            if (state.hadValue && dialog && !dialog.open) {
+              track('journal_item_added', {
+                method: 'quick_dialog',
+                type: 'inbox'
+              });
+            }
+          }, 0);
+        }
+
+        if (state.kind === 'journal-detailed') {
+          setTimeout(() => {
+            const dialog = document.getElementById('journal-dialog');
+            if (state.isNew && state.hadValue && dialog && !dialog.open) {
+              const safeType = [
+                'inbox', 'need', 'goal', 'trade', 'dream'
+              ].includes(state.type) ? state.type : 'inbox';
+
+              track('journal_item_added', {
+                method: 'detailed',
+                type: safeType
+              });
+            }
+          }, 0);
+        }
+
+        if (state.kind === 'character') {
+          setTimeout(() => {
+            const dialog = document.getElementById('character-dialog');
+            if (state.isNew && state.hadValue && dialog && !dialog.open) {
+              track('character_created', {
+                copiedSetup: !!state.copiedSetup
+              });
+            }
+          }, 0);
+        }
+
+        if (state.kind === 'quest-name' && state.completing) {
+          track('quest_completed', {
+            kind: state.questKind
+          });
+        }
+
+        if (state.kind === 'task-save' && state.completing) {
+          setTimeout(() => {
+            const dialog = document.getElementById('task-dialog');
+            if (dialog && !dialog.open) {
+              track('quest_completed', {
+                kind: state.questKind
+              });
+            }
+          }, 0);
+        }
+      });
+
+      // Checkbox completion is the most common quest-completion action.
+      document.addEventListener('change', event => {
+        const input = event.target;
+        if (
+          input?.matches?.('.task-check input[type="checkbox"]') &&
+          input.checked
+        ) {
+          track('quest_completed', {
+            kind: questKind(input)
+          });
+        }
+      });
+
+      // Keyboard quick-capture support.
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+
+        if (event.target?.id === 'journal-quick-input') {
+          const hadValue = !!event.target.value.trim();
+          setTimeout(() => {
+            if (hadValue && !event.target.value) {
+              track('journal_item_added', {
+                method: 'quick',
+                type: 'inbox'
+              });
+            }
+          }, 0);
+        }
+
+        if (event.target?.id === 'journal-quick-dialog-input') {
+          const hadValue = !!event.target.value.trim();
+          setTimeout(() => {
+            const dialog = document.getElementById('journal-quick-dialog');
+            if (hadValue && dialog && !dialog.open) {
+              track('journal_item_added', {
+                method: 'quick_dialog',
+                type: 'inbox'
+              });
+            }
+          }, 0);
+        }
+      });
+
+      const joinDialog = document.getElementById('cloud-join-dialog');
+      joinDialog?.addEventListener('close', () => {
+        if (joinDialog.returnValue === 'connected') {
+          track('cloud_sync_connected', {
+            method: 'join'
+          });
+        }
+      });
+
+      window.addEventListener('appinstalled', () => {
+        track('app_installed');
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener(
+        'DOMContentLoaded',
+        installEngagementEvents,
+        { once: true }
+      );
+    } else {
+      installEngagementEvents();
+    }
+  }
+
+  installVercelInsights();
+
 })();
