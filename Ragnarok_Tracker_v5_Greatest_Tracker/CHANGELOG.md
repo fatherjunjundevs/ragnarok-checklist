@@ -1,3 +1,14 @@
+# v5.4.4 — Silky Completed Grouping
+
+- Made completed-at-bottom grouping the everyday default for v5.4.4 while preserving the player's choice after the migration.
+- Added a subtle **Completed** divider inside each category so unfinished quests stay visually separate from finished work.
+- Added FLIP-style row motion so checking or unchecking a quest glides it between its normal position and the completed section instead of jumping.
+- Organize mode now temporarily shows the canonical manual order without disabling the completed-grouping preference; leaving Organize restores the grouped view smoothly.
+- Daily/weekly reset and Clear Checks return quests to their normal manual positions with the same smooth reflow when the tracker is open.
+- Hide Completed no longer permanently turns off the completed-grouping preference.
+- Preserved v5.4.3 precise dragging, Copy Setup, v5.4 counters/planner/guidance, UTC+7 resets, music, cloud validation, and v5.2 security protections.
+- Bumped application, API health, assets, and service-worker cache to v5.4.4.
+
 # v5.4.3 — Precise Drag & Character Copy
 
 - Anchored the floating drag shell with real fixed `left`/`top` coordinates at the source row, so the card cannot flash or fly in from the top even if a browser delays compositor transforms.
