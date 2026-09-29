@@ -1,0 +1,30 @@
+
+const crypto=require('crypto');
+const ACCESS_COOKIE='rtnw_admin_access',REFRESH_COOKIE='rtnw_admin_refresh',FETCH_TIMEOUT_MS=8000;
+function cfg(){return{base:String(process.env.SUPABASE_URL||'').replace(/\/$/,''),publishKey:String(process.env.SUPABASE_PUBLISHABLE_KEY||process.env.SUPABASE_ANON_KEY||''),serviceKey:String(process.env.SUPABASE_SERVICE_ROLE_KEY||''),adminEmail:String(process.env.ADMIN_EMAIL||'').trim().toLowerCase()}}
+function json(res,status,body){res.setHeader('Cache-Control','no-store, max-age=0');res.setHeader('Pragma','no-cache');res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('X-Content-Type-Options','nosniff');return res.status(status).json(body)}
+function cookies(req){const out={};String(req.headers.cookie||'').split(';').forEach(part=>{const i=part.indexOf('=');if(i<0)return;const k=part.slice(0,i).trim(),raw=part.slice(i+1).trim();try{out[k]=decodeURIComponent(raw)}catch{out[k]=raw}});return out}
+function cookie(name,value,maxAge){return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.max(0,Math.floor(maxAge))}`}
+function setSession(res,data){res.setHeader('Set-Cookie',[cookie(ACCESS_COOKIE,data.access_token||'',Math.max(60,Math.min(Number(data.expires_in)||3600,3600))),cookie(REFRESH_COOKIE,data.refresh_token||'',60*60*24*30)])}
+function clearSession(res){res.setHeader('Set-Cookie',[cookie(ACCESS_COOKIE,'',0),cookie(REFRESH_COOKIE,'',0)])}
+function sameOrigin(req){const origin=String(req.headers.origin||'');if(!origin)return true;const host=String(req.headers['x-forwarded-host']||req.headers.host||'');if(!host)return false;if(origin===`https://${host}`)return true;return /^(localhost|127\\.0\\.0\\.1)(:\\d+)?$/i.test(host)&&origin===`http://${host}`}
+function ip(req){const raw=req.headers['x-vercel-forwarded-for']||req.headers['x-forwarded-for']||req.headers['x-real-ip']||'unknown';return String(Array.isArray(raw)?raw[0]:raw).split(',')[0].trim().slice(0,128)||'unknown'}
+function hash(v,key){return crypto.createHmac('sha256',process.env.RATE_LIMIT_SALT||key).update(String(v),'utf8').digest('hex')}
+async function f(url,options={}){return fetch(url,{...options,cache:'no-store',signal:AbortSignal.timeout(FETCH_TIMEOUT_MS)})}
+async function limit(req,scope,seconds,count){const{base,serviceKey}=cfg();if(!base||!serviceKey)return{allowed:false};const r=await f(`${base}/rest/v1/rpc/check_sync_rate_limit`,{method:'POST',headers:{apikey:serviceKey,Authorization:`Bearer ${serviceKey}`,'Content-Type':'application/json'},body:JSON.stringify({p_scope:scope,p_key_hash:hash(ip(req),serviceKey),p_window_seconds:seconds,p_limit:count})});if(!r.ok)return{allowed:false};const rows=await r.json(),row=Array.isArray(rows)?rows[0]:rows;return{allowed:row?.allowed===true}}
+async function user(base,publishKey,token){if(!token)return null;const r=await f(`${base}/auth/v1/user`,{headers:{apikey:publishKey,Authorization:`Bearer ${token}`}});return r.ok?r.json():null}
+async function refresh(base,publishKey,token){if(!token)return null;const r=await f(`${base}/auth/v1/token?grant_type=refresh_token`,{method:'POST',headers:{apikey:publishKey,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:token})});return r.ok?r.json():null}
+async function requireAdmin(req,res){const{base,publishKey,adminEmail}=cfg();if(!base||!publishKey||!adminEmail)return{error:'Admin authentication is not configured.',status:503};const c=cookies(req);let u=await user(base,publishKey,c[ACCESS_COOKIE]||'');if(!u&&c[REFRESH_COOKIE]){const s=await refresh(base,publishKey,c[REFRESH_COOKIE]);if(s?.access_token){setSession(res,s);u=s.user||await user(base,publishKey,s.access_token)}}if(!u||String(u.email||'').trim().toLowerCase()!==adminEmail){clearSession(res);return{error:'Admin sign-in required.',status:401}}return{user:u}}
+
+const STATUSES=new Set(['new','reviewing','planned','fixed','closed']);
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function dbh(key,prefer){const h={apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'};if(prefer)h.Prefer=prefer;return h}
+module.exports=async function handler(req,res){
+if(!['GET','PATCH'].includes(req.method||'')){res.setHeader('Allow','GET, PATCH');return json(res,405,{error:'Method not allowed.'})}
+if(req.method==='PATCH'&&!sameOrigin(req))return json(res,403,{error:'Request origin is not allowed.'});
+const auth=await requireAdmin(req,res);if(auth.error)return json(res,auth.status||401,{error:auth.error});
+const{base,serviceKey}=cfg();if(!base||!serviceKey)return json(res,503,{error:'Feedback admin service is not configured.'});
+if(req.method==='GET'){const select=['id','feedback_type','area','message','steps','expected','contact','diagnostics','status','admin_notes','reviewed_at','resolved_at','created_at','updated_at'].join(',');const r=await f(`${base}/rest/v1/tracker_feedback?select=${encodeURIComponent(select)}&order=created_at.desc&limit=500`,{headers:dbh(serviceKey)});if(!r.ok)return json(res,502,{error:'Could not load feedback right now.'});const rows=await r.json();return json(res,200,{ok:true,feedback:Array.isArray(rows)?rows:[]})}
+let body=req.body||{};if(typeof body==='string'){try{body=JSON.parse(body)}catch{body={}}}const id=String(body.id||'').trim(),status=String(body.status||'').trim().toLowerCase(),adminNotes=String(body.admin_notes??'').replace(/\\r\\n/g,'\\n').trim().slice(0,5000);if(!UUID_RE.test(id)||!STATUSES.has(status))return json(res,400,{error:'Invalid feedback update.'});
+const r=await f(`${base}/rest/v1/tracker_feedback?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:dbh(serviceKey,'return=representation'),body:JSON.stringify({status,admin_notes:adminNotes})});if(!r.ok)return json(res,502,{error:'Could not save feedback changes.'});const rows=await r.json(),row=Array.isArray(rows)?rows[0]:null;if(!row)return json(res,404,{error:'Feedback report not found.'});return json(res,200,{ok:true,feedback:row});
+};
