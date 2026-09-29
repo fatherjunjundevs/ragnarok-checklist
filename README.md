@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.4.1
+# Ragnarok: The New World Tracker v5.4.3
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -131,6 +131,21 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.4.3 — Precise drag + character copy
+
+- Anchors the floating quest card at the source row using real fixed coordinates, with direct requestAnimationFrame pointer tracking for a more attached mouse/touch feel.
+- Uses the dragged card center to determine drop position for steadier reordering.
+- Replaces the old numeric browser prompt for Copy Setup with an explicit **Copy from → Copy to** character modal and transfer preview.
+- Copy Setup copies quest structure/settings but intentionally resets destination completion progress.
+
+### v5.4.2 — Silky Organize drag polish
+
+- Fixed the mobile one-frame jump that could make a picked-up quest appear to come from the top of the screen.
+- Floating quests are positioned at the source row before first paint, so they lift directly from the place you touched.
+- Separated card movement from the lift/scale animation for smoother tracking.
+- Added touch interpolation, coalesced pointer sampling, non-smooth edge scrolling during drag, and lighter list reflow work.
+- Added a short settle animation into the drop slot for a less abrupt release.
 
 ### v5.4.1 — Smooth Organize drag patch
 
