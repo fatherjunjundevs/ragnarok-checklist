@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.4.3
+# Ragnarok: The New World Tracker v5.4.4
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -6,7 +6,7 @@ A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server 
 
 1. Automatic cloud-sync engine for phone ↔ PC pairing (Vercel API + Supabase table).
 2. Sticky quick bar with character switch, daily/weekly progress, reset countdown, filters, and Finish Before Reset mode.
-3. Hide completed, collapse Dailies/Weeklies/categories, and optional completed-to-bottom sorting.
+3. Hide completed, collapse Dailies/Weeklies/categories, and silky completed-at-bottom grouping with a Completed divider.
 4. Multi-character profiles with job/class, portrait emoji, quick switching, and quest-setup copying.
 5. Quest categories with custom categories and drag-to-reorder / drag-between-category support.
 6. Optional reset reminders using browser notifications while the app is active/PWA-supported.
@@ -131,6 +131,14 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.4.4 — Silky completed grouping
+
+- Checked quests smoothly move below a **Completed** divider inside their category while unfinished quests stay at the top.
+- The manual order created in Organize mode remains the canonical order; completed grouping is only a temporary everyday view.
+- Organize mode pauses grouping without turning the preference off, then smoothly restores grouping when you finish organizing.
+- Daily/weekly reset and Clear Checks return quests to their normal order when completion is cleared.
+- Completed grouping is enabled by default for the v5.4.4 migration and remains user-configurable in Settings → Gameplay.
 
 ### v5.4.3 — Precise drag + character copy
 
