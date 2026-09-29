@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.6.0';
+  const VERSION = '5.6.1';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -178,7 +178,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4','5.5.0','5.6.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4','5.5.0','5.6.0','5.6.1'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     // v5.4.4 introduces completed grouping as the everyday default. Migrate it
@@ -922,27 +922,45 @@
   }
   function feedbackDiagnosticsText(){const d=safeFeedbackDiagnostics();return [`Ragnarok Tracker Diagnostics`,`Version: ${d.appVersion}`,`Browser: ${d.browser}`,`Platform: ${d.platform}`,`Viewport: ${d.viewport}`,`Screen: ${d.screen}`,`Mode: ${d.displayMode}`,`Theme: ${d.theme}`,`Online: ${d.online?'Yes':'No'}`,`Cloud configured: ${d.cloudConfigured?'Yes':'No'}`].join('\n');}
   function updateFeedbackForm(){
-    const type=$('feedback-type')?.value||'bug',bug=type==='bug';
+    const type=$('feedback-type')?.value||'',bug=type==='bug';
     if($('feedback-bug-fields'))$('feedback-bug-fields').hidden=!bug;
-    if($('feedback-message-label'))$('feedback-message-label').firstChild.textContent=bug?'What happened?':'What would you like to share?';
+    if($('feedback-message-label'))$('feedback-message-label').firstChild.textContent=bug?'What happened?':type?'What would you like to share?':'Tell us what you would like to share';
+    if($('feedback-message'))$('feedback-message').placeholder=bug?'Tell me what you noticed…':type==='suggestion'?'What would make the tracker better?':type==='general'?'Share your experience or thoughts…':'Choose a feedback type, then tell me what is on your mind…';
     setText('feedback-diagnostics-preview',feedbackDiagnosticsText());
+  }
+  function resetFeedbackFormForOpen(){
+    if($('feedback-message')?.value)return;
+    $('feedback-type').value='';$('feedback-area').value='';$('feedback-steps').value='';$('feedback-expected').value='';$('feedback-contact').value='';$('feedback-website').value='';
+    if($('feedback-fallback'))$('feedback-fallback').hidden=true;
   }
   function openFeedbackDialog(){
     const d=$('feedback-dialog');if(!d)return;
-    if(!$('feedback-message').value){$('feedback-type').value='bug';$('feedback-area').value='dailies';}
-    setText('feedback-status','');updateFeedbackForm();if(!d.open)d.showModal();setTimeout(()=>$('feedback-message')?.focus(),50);
+    resetFeedbackFormForOpen();setText('feedback-status','');updateFeedbackForm();if(!d.open)d.showModal();setTimeout(()=>$('feedback-type')?.focus(),50);
+  }
+  function feedbackReportText(){
+    const type=$('feedback-type')?.value||'Not selected',area=$('feedback-area')?.value||'Not selected',message=$('feedback-message')?.value.trim()||'',steps=$('feedback-steps')?.value.trim()||'',expected=$('feedback-expected')?.value.trim()||'',contact=$('feedback-contact')?.value.trim()||'';
+    const typeLabel=$('feedback-type')?.selectedOptions?.[0]?.textContent?.trim()||type,areaLabel=$('feedback-area')?.selectedOptions?.[0]?.textContent?.trim()||area;
+    const lines=['Ragnarok Tracker Feedback',`Type: ${typeLabel}`,`Area: ${areaLabel}`,'',message];
+    if(type==='bug'&&steps)lines.push('',`Steps to reproduce:`,steps);
+    if(type==='bug'&&expected)lines.push('',`Expected instead:`,expected);
+    if(contact)lines.push('',`Contact: ${contact}`);
+    lines.push('',feedbackDiagnosticsText());return lines.join('\n');
   }
   async function copyFeedbackDiagnostics(){try{await copyText(feedbackDiagnosticsText());toast('Diagnostics copied.','good')}catch(e){toast('Could not copy diagnostics.','bad')}}
+  async function copyFeedbackReport(){try{await copyText(feedbackReportText());toast('Feedback report copied.','good')}catch(e){toast('Could not copy the report.','bad')}}
   async function submitFeedback(){
     const type=$('feedback-type').value,area=$('feedback-area').value,message=$('feedback-message').value.trim(),steps=$('feedback-steps').value.trim(),expected=$('feedback-expected').value.trim(),contact=$('feedback-contact').value.trim(),website=$('feedback-website').value;
+    if(!['bug','suggestion','general'].includes(type)){setText('feedback-status','Please choose a feedback type.');$('feedback-type').focus();return;}
+    if(!['dailies','weeklies','journal','characters','layout','mobile','cloud','other'].includes(area)){setText('feedback-status','Please choose which area this is about.');$('feedback-area').focus();return;}
     if(message.length<3){setText('feedback-status','Please add a little more detail before sending.');$('feedback-message').focus();return;}
+    if($('feedback-fallback'))$('feedback-fallback').hidden=true;
     const btn=$('feedback-submit');btn.disabled=true;btn.textContent='Sending…';setText('feedback-status','Sending privately…');
     try{
       const r=await fetch('/api/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type,area,message,steps:type==='bug'?steps:'',expected:type==='bug'?expected:'',contact,website,diagnostics:safeFeedbackDiagnostics()}),cache:'no-store',credentials:'same-origin'});
       let data={};try{data=await r.json()}catch(e){}
       if(!r.ok){if(r.status===429)throw new Error('You have sent several reports recently. Please try again later.');throw new Error(data.error||'Feedback could not be sent right now.');}
-      $('feedback-message').value='';$('feedback-steps').value='';$('feedback-expected').value='';$('feedback-contact').value='';$('feedback-website').value='';setText('feedback-status','Thanks! Your private feedback was sent to FatherJunJun.');toast('Thanks! Feedback sent. ❤️','good');setTimeout(()=>$('feedback-dialog')?.close('sent'),650);
-    }catch(e){setText('feedback-status',e.message);toast(e.message,'bad')}
+      $('feedback-message').value='';$('feedback-steps').value='';$('feedback-expected').value='';$('feedback-contact').value='';$('feedback-website').value='';$('feedback-type').value='';$('feedback-area').value='';updateFeedbackForm();setText('feedback-status','Thanks! Your private feedback was sent to FatherJunJun.');toast('Thanks! Feedback sent. ❤️','good');setTimeout(()=>$('feedback-dialog')?.close('sent'),650);
+    }catch(e){setText('feedback-status',`${e.message} You can copy your report below and send it to FatherJunJun manually.`);if($('feedback-fallback'))$('feedback-fallback').hidden=false;toast(e.message,'bad')}
     finally{btn.disabled=false;btn.textContent='Send Feedback';}
   }
   function exportBackup(){ const blob=new Blob([JSON.stringify(app,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ragnarok-tracker-backup-${dayKey()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported.','good'); }
@@ -1104,7 +1122,8 @@
     $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',openCopySetupDialog);$('copy-setup-from')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-to')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-submit')?.addEventListener('click',e=>{e.preventDefault();submitCopySetup()});$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
-    ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));['open-feedback','footer-feedback','settings-feedback'].forEach(id=>$(id)?.addEventListener('click',openFeedbackDialog));$('feedback-type')?.addEventListener('change',updateFeedbackForm);$('feedback-copy-diagnostics')?.addEventListener('click',copyFeedbackDiagnostics);$('feedback-submit')?.addEventListener('click',e=>{e.preventDefault();submitFeedback()});$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
+    ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));['open-feedback','footer-feedback','settings-feedback'].forEach(id=>$(id)?.addEventListener('click',openFeedbackDialog));$('feedback-type')?.addEventListener('change',updateFeedbackForm);$('feedback-copy-diagnostics')?.addEventListener('click',copyFeedbackDiagnostics);$('feedback-copy-report')?.addEventListener('click',copyFeedbackReport);$('feedback-submit')?.addEventListener('click',e=>{e.preventDefault();submitFeedback()});$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
+    ['footer-getting-started','settings-getting-started'].forEach(id=>$(id)?.addEventListener('click',()=>{const d=$('getting-started-dialog');if(d&&!d.open)d.showModal()}));['footer-whats-new','settings-whats-new'].forEach(id=>$(id)?.addEventListener('click',()=>{const d=$('whats-new-dialog');if(d&&!d.open)d.showModal()}));
     const jumpTo=id=>{if($('settings-dialog')?.open)$('settings-dialog').close();requestAnimationFrame(()=>$(`${id}`)?.scrollIntoView({behavior:'smooth',block:'start'}))};
     $('settings-go-journal')?.addEventListener('click',()=>jumpTo('journal-card'));$('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
     $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
