@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.4.3';
+  const VERSION = '5.4.4';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -118,7 +118,7 @@
     }
     profile.daily.splice(at+1,0,elite);
   }
-  function defaultSettings(){ return {hideCompleted:false,completedBottom:false,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2,sessionMinutes:15}; }
+  function defaultSettings(){ return {hideCompleted:false,completedBottom:true,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2,sessionMinutes:15}; }
   function normalizeApp(input){
     const raw = input && typeof input==='object' ? input : {};
     let profiles;
@@ -127,9 +127,12 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
+    // v5.4.4 introduces completed grouping as the everyday default. Migrate it
+    // on once for older tracker state; after v5.4.4 the player's preference is preserved.
+    if(savedVersion && savedVersion!==VERSION) settings.completedBottom=true;
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
     settings.sessionMinutes=SESSION_MINUTES.includes(Number(settings.sessionMinutes))?Number(settings.sessionMinutes):15;
     settings.collapsedSections={daily:false,weekly:false,...(raw.settings?.collapsedSections||{})};
@@ -246,10 +249,36 @@
     const filtered = app.settings.finishMode || app.settings.hideCompleted;
     if(filtered) tasks=tasks.filter(t=>!t.done);
     if(app.settings.finishMode) tasks.sort((a,b)=>(Number(b.favorite)-Number(a.favorite))||(b.priority-a.priority)||(profile[kind].indexOf(a)-profile[kind].indexOf(b)));
-    else if(app.settings.completedBottom) tasks.sort((a,b)=>(Number(a.done)-Number(b.done))||(profile[kind].indexOf(a)-profile[kind].indexOf(b)));
+    else if(app.settings.completedBottom&&!organizeMode) tasks.sort((a,b)=>(Number(a.done)-Number(b.done))||(profile[kind].indexOf(a)-profile[kind].indexOf(b)));
     return tasks;
   }
-  function canDrag(){ return organizeMode && !app.settings.finishMode && !app.settings.hideCompleted && !app.settings.completedBottom; }
+  function canDrag(){ return organizeMode && !app.settings.finishMode && !app.settings.hideCompleted; }
+  function captureTaskLayout(kind){
+    const map=new Map();
+    $$(`#${kind}-groups .task-row`).forEach(row=>{
+      const id=row.dataset.taskId;
+      if(id)map.set(id,row.getBoundingClientRect());
+    });
+    return map;
+  }
+  function animateTaskLayout(kind,before,focusId=null,tone='reflow'){
+    if(!before?.size||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    const rows=$$(`#${kind}-groups .task-row`);
+    rows.forEach(row=>{
+      const old=before.get(row.dataset.taskId);if(!old)return;
+      const next=row.getBoundingClientRect(),dx=old.left-next.left,dy=old.top-next.top;
+      if(Math.abs(dx)<.5&&Math.abs(dy)<.5)return;
+      if(row.dataset.taskId===focusId){row.classList.add('quest-reflow-focus');row.dataset.reflowTone=tone}
+      const anim=row.animate([
+        {transform:`translate3d(${dx.toFixed(2)}px,${dy.toFixed(2)}px,0)`},
+        {transform:'translate3d(0,0,0)'}
+      ],{duration:360,easing:'cubic-bezier(.18,.82,.2,1)',fill:'both'});
+      anim.onfinish=anim.oncancel=()=>{row.classList.remove('quest-reflow-focus');delete row.dataset.reflowTone};
+    });
+  }
+  function renderKindWithMotion(kind,before,focusId=null,tone='reflow'){
+    renderKind(kind);requestAnimationFrame(()=>animateTaskLayout(kind,before,focusId,tone));
+  }
   function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
@@ -311,7 +340,17 @@
     head.innerHTML=`<div class="category-title"><span class="category-icon" aria-hidden="true">${categoryIcon(category)}</span><strong>${escapeHTML(category)}</strong><span class="category-progress">${categoryDone}/${categoryAll.length}</span></div>`;
     const btn=document.createElement('button');btn.type='button';btn.textContent=collapsed?'Expand':'Collapse';btn.addEventListener('click',()=>{app.settings.collapsedCategories[kind][category]=!collapsed;saveLocal('Category view changed');renderKind(kind)});head.append(btn);block.append(head);
     const list=document.createElement('ul');list.className='task-list';list.dataset.kind=kind;list.dataset.category=category;list.hidden=collapsed;
-    tasks.forEach(t=>list.append(renderTask(kind,t))); block.append(list); return block;
+    const grouped=app.settings.completedBottom&&!organizeMode&&!app.settings.finishMode&&!app.settings.hideCompleted;
+    const firstDone=grouped?tasks.findIndex(t=>t.done):-1;
+    const completedCount=grouped?tasks.filter(t=>t.done).length:0;
+    tasks.forEach((t,i)=>{
+      if(i===firstDone){
+        const divider=document.createElement('li');divider.className='completed-divider';divider.setAttribute('role','separator');divider.setAttribute('aria-label',`${completedCount} completed quest${completedCount===1?'':'s'}`);
+        divider.innerHTML=`<span>✓ Completed</span><small>${completedCount}</small>`;list.append(divider);
+      }
+      list.append(renderTask(kind,t));
+    });
+    block.append(list); return block;
   }
   function renderTask(kind,task){
     const row=document.createElement('li');row.className=`task-row${task.done?' done':''}${task.favorite?' favorite':''}${task.priority===2?' high':''}${task.priority===3?' urgent':''}`;row.dataset.taskId=task.id;row.dataset.kind=kind;
@@ -351,7 +390,9 @@
     const edit=document.createElement('button');edit.type='button';edit.className='edit-task organize-only';edit.textContent='Edit';edit.addEventListener('click',()=>openTaskDialog(kind,task.id));row.append(edit);return row;
   }
   function commitTaskProgress(kind,task,value,reason='Quest progress'){
-    const before=!!task.done;setTaskProgress(task,value);recordPeriod(active(),kind,kind==='daily'?active().dailyDate:active().weekDate);saveLocal(reason);playSfx(task.done&&!before?'done':before&&!task.done?'undo':'');renderKind(kind);renderQuick();renderAllCharacters();renderSessionPlanner();if(task.done&&!before)checkCompletion(kind);
+    const layout=captureTaskLayout(kind),before=!!task.done;
+    setTaskProgress(task,value);recordPeriod(active(),kind,kind==='daily'?active().dailyDate:active().weekDate);saveLocal(reason);playSfx(task.done&&!before?'done':before&&!task.done?'undo':'');
+    renderKindWithMotion(kind,layout,task.id,task.done&&!before?'complete':before&&!task.done?'undo':'reflow');renderQuick();renderAllCharacters();renderSessionPlanner();if(task.done&&!before)checkCompletion(kind);
   }
   function celebrateCompletion(kind){
     const p=active(),period=kind==='daily'?p.dailyDate:p.weekDate,key=`celebration:${p.id}:${kind}:${period}`;
@@ -805,20 +846,20 @@
     }
   }
 
-  function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));const resetCard=$('daily-reset-card');if(resetCard){resetCard.classList.toggle('reset-near',ms<=2*3600000);resetCard.classList.toggle('reset-urgent',ms<=30*60000)}const connectionCard=$('connection-card');if(connectionCard){connectionCard.classList.toggle('is-online',navigator.onLine);connectionCard.classList.toggle('is-offline',!navigator.onLine)}reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
+  function tick(){ const now=new Date(),reset=nextDailyReset(now),ms=reset-now;setText('server-clock',serverClockText(now));setText('daily-countdown',duration(ms));setText('quick-reset',duration(ms,true));const resetCard=$('daily-reset-card');if(resetCard){resetCard.classList.toggle('reset-near',ms<=2*3600000);resetCard.classList.toggle('reset-urgent',ms<=30*60000)}const connectionCard=$('connection-card');if(connectionCard){connectionCard.classList.toggle('is-online',navigator.onLine);connectionCard.classList.toggle('is-offline',!navigator.onLine)}reminderTick(ms);const d=dayKey(now),w=weekKey(now);if(d!==lastDay||w!==lastWeek){const dailyLayout=captureTaskLayout('daily'),weeklyLayout=captureTaskLayout('weekly');lastDay=d;lastWeek=w;if(rolloverAll()){createSnapshot('Automatic reset');saveLocal('Server reset');renderAll();requestAnimationFrame(()=>{animateTaskLayout('daily',dailyLayout,null,'reset');animateTaskLayout('weekly',weeklyLayout,null,'reset')});toast('Checklist reset for the new server period.','good')}}if(app.settings.finishAuto&&ms<=2*3600000&&active().daily.some(t=>!t.done)){const k=`finish:${active().id}:${dayKey()}`;if(!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');toast('Reset is close. Finish Before Reset mode is ready if you want it.')}} }
 
   function bindUI(){
     document.addEventListener('selectstart',e=>{ if(drag) e.preventDefault(); },{passive:false});
     document.addEventListener('contextmenu',e=>{ if(drag || e.target.closest?.('.drag-handle')) e.preventDefault(); });
     $$('[data-dialog-close]').forEach(btn=>btn.addEventListener('click',()=>{ const dialog=btn.closest('dialog'); if(dialog?.open) dialog.close('cancel'); }));
     $$('.modal').forEach(dialog=>dialog.addEventListener('cancel',e=>{ e.preventDefault(); dialog.close('cancel'); }));
-    $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted){app.settings.completedBottom=false;organizeMode=false}saveLocal('Filter changed');renderAll()});
+    $('toggle-hide-completed').addEventListener('click',()=>{app.settings.hideCompleted=!app.settings.hideCompleted;if(app.settings.hideCompleted)organizeMode=false;saveLocal('Filter changed');renderAll()});
     $('toggle-finish-mode').addEventListener('click',()=>{app.settings.finishMode=!app.settings.finishMode;if(app.settings.finishMode)organizeMode=false;saveLocal('Finish mode changed');renderAll()});
-    $('toggle-organize').addEventListener('click',()=>{organizeMode=!organizeMode;if(organizeMode){const changed=app.settings.hideCompleted||app.settings.completedBottom||app.settings.finishMode;app.settings.hideCompleted=false;app.settings.completedBottom=false;app.settings.finishMode=false;if(changed)saveLocal('Organize mode prepared')}renderAll();toast(organizeMode?'Organize mode on — drag a quest card to move it.':'Organize mode off.','good')});
+    $('toggle-organize').addEventListener('click',()=>{const dailyLayout=captureTaskLayout('daily'),weeklyLayout=captureTaskLayout('weekly');organizeMode=!organizeMode;if(organizeMode){const changed=app.settings.hideCompleted||app.settings.finishMode;app.settings.hideCompleted=false;app.settings.finishMode=false;if(changed)saveLocal('Organize mode prepared')}renderAll();requestAnimationFrame(()=>{animateTaskLayout('daily',dailyLayout);animateTaskLayout('weekly',weeklyLayout)});toast(organizeMode?'Organize mode on — completed grouping is paused while you arrange quests.':'Organize mode off — completed quests are grouped again.','good')});
     $('quick-character-select').addEventListener('change',e=>{app.activeProfileId=e.target.value;saveLocal('Character switched');renderAll()});
     $$('[data-collapse]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.collapse;app.settings.collapsedSections[k]=!app.settings.collapsedSections[k];saveLocal('Section view changed');renderKind(k)}));
     $$('[data-add-task]').forEach(b=>b.addEventListener('click',()=>openTaskDialog(b.dataset.addTask)));
-    $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.progress=0;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKind(k);renderQuick();renderAllCharacters();renderSessionPlanner()}));
+    $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;const layout=captureTaskLayout(k);createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.progress=0;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKindWithMotion(k,layout,null,'reset');renderQuick();renderAllCharacters();renderSessionPlanner()}));
     $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',openCopySetupDialog);$('copy-setup-from')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-to')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-submit')?.addEventListener('click',e=>{e.preventDefault();submitCopySetup()});$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
@@ -827,7 +868,7 @@
     $('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
     $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
-    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked){app.settings.completedBottom=false;organizeMode=false}if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
+    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)organizeMode=false;if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
     $('restore-snapshot').addEventListener('click',()=>{renderSnapshots();$('snapshot-dialog').showModal()});$('export-backup').addEventListener('click',exportBackup);$('import-backup').addEventListener('click',()=>$('backup-file').click());$('backup-file').addEventListener('change',()=>{const f=$('backup-file').files?.[0];if(f)importBackupFile(f);$('backup-file').value=''});
