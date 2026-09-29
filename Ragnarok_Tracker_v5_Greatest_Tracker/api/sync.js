@@ -139,7 +139,7 @@ function validateProfile(profile) {
 }
 function validateSettings(settings) {
   if (!isObject(settings)) return false;
-  const bools = ['hideCompleted','completedBottom','compact','uiSounds','autoplay','finishMode','finishAuto','reminders'];
+  const bools = ['hideCompleted','completedBottom','compact','desktopEfficient','collapseCompletedCategories','uiSounds','autoplay','finishMode','finishAuto','reminders'];
   for (const key of bools) if (key in settings && typeof settings[key] !== 'boolean') return false;
   if ('theme' in settings && !['system','light','dark'].includes(settings.theme)) return false;
   if ('musicVolume' in settings && (!Number.isFinite(Number(settings.musicVolume)) || Number(settings.musicVolume) < 0 || Number(settings.musicVolume) > 100)) return false;
