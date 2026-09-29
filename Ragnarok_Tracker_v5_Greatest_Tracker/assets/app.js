@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.5.0';
+  const VERSION = '5.6.0';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -169,7 +169,7 @@
     }
     profile.daily.splice(at+1,0,elite);
   }
-  function defaultSettings(){ return {hideCompleted:false,completedBottom:true,compact:false,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2,sessionMinutes:15}; }
+  function defaultSettings(){ return {hideCompleted:false,completedBottom:true,compact:false,desktopEfficient:true,collapseCompletedCategories:true,uiSounds:true,autoplay:true,theme:'system',finishMode:false,finishAuto:true,collapsedSections:{daily:false,weekly:false},collapsedCategories:{daily:{},weekly:{}},musicVolume:35,reminders:false,reminderHours:2,sessionMinutes:15}; }
   function normalizeApp(input){
     const raw = input && typeof input==='object' ? input : {};
     let profiles;
@@ -178,7 +178,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4','5.5.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4','5.5.0','5.6.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     // v5.4.4 introduces completed grouping as the everyday default. Migrate it
@@ -216,6 +216,7 @@
   let sfxCtx=null;
   let celebrationTimer=null;
   let organizeMode=false;
+  const completedCategoryExpanded=new Set();
   let journalFilter='all';
   let mobileSection='daily-card';
   const theme=$('theme-audio');
@@ -333,7 +334,7 @@
   function renderKindWithMotion(kind,before,focusId=null,tone='reflow'){
     renderKind(kind);requestAnimationFrame(()=>animateTaskLayout(kind,before,focusId,tone));
   }
-  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderJournal(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); }
+  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('desktop-efficient',!!app.settings.desktopEfficient); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderJournal(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
     app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.style.setProperty('--tab-accent',accentColor(p.accent)); b.innerHTML=`<span class="character-avatar">${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
@@ -463,6 +464,41 @@
     setText('quick-daily',`${dd}/${p.daily.length}`); setText('quick-weekly',`${wd}/${p.weekly.length}`);
     setPressed('toggle-hide-completed',app.settings.hideCompleted); setPressed('toggle-finish-mode',app.settings.finishMode); setPressed('toggle-organize',organizeMode);
   }
+  function categoryExpandKey(kind,category){ return `${active().id}:${kind}:${category}`; }
+  function scrollToDailyCategory(category){
+    const key=categoryExpandKey('daily',category);
+    const all=active().daily.filter(t=>t.category===category);
+    let rerender=false;
+    if(app.settings.collapsedCategories.daily?.[category]){app.settings.collapsedCategories.daily[category]=false;saveLocal('Category expanded from jump');rerender=true;}
+    if(app.settings.collapseCompletedCategories&&all.length&&all.every(t=>t.done)&&!completedCategoryExpanded.has(key)){completedCategoryExpanded.add(key);rerender=true;}
+    if(rerender)renderKind('daily');
+    const block=$$('#daily-groups .category-block').find(x=>x.dataset.category===category);
+    if(!block)return;
+    requestAnimationFrame(()=>{
+      const target=$$('#daily-groups .category-block').find(x=>x.dataset.category===category);
+      target?.scrollIntoView({behavior:'smooth',block:'start'});
+      target?.classList.add('category-jump-focus');
+      setTimeout(()=>target?.classList.remove('category-jump-focus'),900);
+    });
+  }
+  function renderDailyCategoryJump(){
+    const root=$('daily-category-jump');if(!root)return;
+    root.replaceChildren();
+    if(organizeMode||app.settings.collapsedSections.daily){root.hidden=true;return;}
+    const visible=displayTasks(active(),'daily'),visibleCategories=new Set(visible.map(t=>t.category));
+    const allGroups=new Map();active().daily.forEach(t=>{if(!allGroups.has(t.category))allGroups.set(t.category,[]);allGroups.get(t.category).push(t)});
+    const order=[...app.categories,...[...allGroups.keys()].filter(c=>!app.categories.includes(c))].filter(c=>visibleCategories.has(c));
+    if(order.length<2){root.hidden=true;return;}
+    const label=document.createElement('span');label.className='category-jump-label';label.textContent='Jump to';root.append(label);
+    order.forEach(category=>{
+      const tasks=allGroups.get(category),done=tasks.filter(t=>t.done).length,remaining=tasks.length-done;
+      const b=document.createElement('button');b.type='button';b.className='category-jump-chip'+(remaining===0?' done':'');
+      b.innerHTML=`<span aria-hidden="true">${categoryIcon(category)}</span><b>${escapeHTML(category)}</b><small>${remaining===0?'✓':remaining}</small>`;
+      b.title=remaining===0?`${category} complete`:`${remaining} ${remaining===1?'quest':'quests'} remaining`;
+      b.addEventListener('click',()=>scrollToDailyCategory(category));root.append(b);
+    });
+    root.hidden=false;
+  }
   function renderKind(kind){
     const p=active(); recordPeriod(p,kind,kind==='daily'?p.dailyDate:p.weekDate);
     const tasks=p[kind],done=tasks.filter(t=>t.done).length,total=tasks.length,pct=total?done/total*100:0;
@@ -476,15 +512,30 @@
     shown.forEach(t=>{if(!byCat.has(t.category))byCat.set(t.category,[]);byCat.get(t.category).push(t)});
     const order=[...app.categories,...[...byCat.keys()].filter(c=>!app.categories.includes(c))];
     const cats=order.filter(c=>byCat.has(c));
-    if(!cats.length){ const e=document.createElement('div');e.className='empty-state';e.textContent=tasks.length?'Everything visible here is complete. Great work.':'No quests yet. Add one to begin.';root.append(e);return; }
+    if(!cats.length){ const e=document.createElement('div');e.className='empty-state';e.textContent=tasks.length?'Everything visible here is complete. Great work.':'No quests yet. Add one to begin.';root.append(e);if(kind==='daily')renderDailyCategoryJump();return; }
     cats.forEach(category=>root.append(renderCategory(kind,category,byCat.get(category))));
+    if(kind==='daily')renderDailyCategoryJump();
   }
   function renderCategory(kind,category,tasks){
     const block=document.createElement('section');block.className='category-block';block.dataset.category=category;
-    const head=document.createElement('div');head.className='category-head'; const collapsed=!!app.settings.collapsedCategories[kind]?.[category];
     const categoryAll=active()[kind].filter(t=>t.category===category),categoryDone=categoryAll.filter(t=>t.done).length;
-    head.innerHTML=`<div class="category-title"><span class="category-icon" aria-hidden="true">${categoryIcon(category)}</span><strong>${escapeHTML(category)}</strong><span class="category-progress">${categoryDone}/${categoryAll.length}</span></div>`;
-    const btn=document.createElement('button');btn.type='button';btn.textContent=collapsed?'Expand':'Collapse';btn.addEventListener('click',()=>{app.settings.collapsedCategories[kind][category]=!collapsed;saveLocal('Category view changed');renderKind(kind)});head.append(btn);block.append(head);
+    const categoryComplete=categoryAll.length>0&&categoryDone===categoryAll.length;
+    const expandKey=categoryExpandKey(kind,category);
+    const manualCollapsed=!!app.settings.collapsedCategories[kind]?.[category];
+    const autoCollapsed=!!app.settings.collapseCompletedCategories&&categoryComplete&&!organizeMode&&!app.settings.finishMode&&!app.settings.hideCompleted&&!completedCategoryExpanded.has(expandKey);
+    const collapsed=manualCollapsed||autoCollapsed;
+    block.classList.toggle('category-complete',categoryComplete);block.classList.toggle('category-auto-collapsed',autoCollapsed);
+    const head=document.createElement('div');head.className='category-head';
+    head.innerHTML=`<div class="category-title"><span class="category-icon" aria-hidden="true">${categoryIcon(category)}</span><strong>${escapeHTML(category)}</strong><span class="category-progress${categoryComplete?' complete':''}">${categoryComplete?'✓ ':''}${categoryDone}/${categoryAll.length}</span></div>`;
+    const btn=document.createElement('button');btn.type='button';btn.textContent=collapsed?'Expand':'Collapse';
+    btn.addEventListener('click',()=>{
+      if(app.settings.collapseCompletedCategories&&categoryComplete&&!organizeMode&&!app.settings.finishMode&&!app.settings.hideCompleted){
+        if(collapsed){completedCategoryExpanded.add(expandKey);app.settings.collapsedCategories[kind][category]=false;}
+        else completedCategoryExpanded.delete(expandKey);
+        renderKind(kind);return;
+      }
+      app.settings.collapsedCategories[kind][category]=!manualCollapsed;saveLocal('Category view changed');renderKind(kind);
+    });head.append(btn);block.append(head);
     const list=document.createElement('ul');list.className='task-list';list.dataset.kind=kind;list.dataset.category=category;list.hidden=collapsed;
     const grouped=app.settings.completedBottom&&!organizeMode&&!app.settings.finishMode&&!app.settings.hideCompleted;
     const firstDone=grouped?tasks.findIndex(t=>t.done):-1;
@@ -827,7 +878,7 @@
     toast(`Copied ${src.name}'s setup to ${dest.name}. ${dest.name}'s completion progress was reset.`,'good');
   }
 
-  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);if($('session-minutes'))$('session-minutes').value=String(app.settings.sessionMinutes||15);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
+  function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-desktop-efficient').checked=!!app.settings.desktopEfficient;$('setting-collapse-completed-categories').checked=!!app.settings.collapseCompletedCategories;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);if($('session-minutes'))$('session-minutes').value=String(app.settings.sessionMinutes||15);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
   function renderCategoryChips(){ const root=$('category-chips');root.replaceChildren();app.categories.forEach(c=>{const chip=document.createElement('span');chip.className='category-chip';chip.append(document.createTextNode(c));if(c!=='General'){const b=document.createElement('button');b.type='button';b.textContent='×';b.title=`Delete ${c}`;b.addEventListener('click',()=>deleteCategory(c));chip.append(b)}root.append(chip)}); }
   function addCategory(){ const c=norm($('new-category-name').value).slice(0,30);if(!c)return;if(app.categories.some(x=>x.toLowerCase()===c.toLowerCase())){toast('That category already exists.');return;}app.categories.push(c);$('new-category-name').value='';saveLocal('Category added');renderCategoryChips(); }
   function deleteCategory(c){ const used=app.profiles.some(p=>[...p.daily,...p.weekly].some(t=>t.category===c));if(used&&!confirm(`Move quests in “${c}” to General and delete this category?`))return;app.profiles.forEach(p=>[...p.daily,...p.weekly].forEach(t=>{if(t.category===c)t.category='General'}));app.categories=app.categories.filter(x=>x!==c);saveLocal('Category deleted',{snapshot:true,snapshotReason:'Before category deletion'});renderAll(); }
@@ -850,6 +901,49 @@
   async function shareTracker(){
     const data={title:'Ragnarok: The New World Tracker | FatherJunJun',text:'Check out the Ragnarok: The New World Tracker by FatherJunJun — a free fan-made tool for managing daily quests, weeklies, multiple characters, reset timers, and progress.',url:TRACKER_URL};
     try{if(navigator.share){await navigator.share(data);return;}await copyText(TRACKER_URL);toast('Tracker link copied.','good')}catch(e){if(e?.name!=='AbortError')toast('Could not share the tracker right now.','bad')}
+  }
+  function feedbackBrowserLabel(){
+    const ua=navigator.userAgent||'';
+    const match=(re,name)=>{const m=ua.match(re);return m?`${name} ${m[1]}`:null};
+    return match(/Edg\/([\d.]+)/,'Edge')||match(/Firefox\/([\d.]+)/,'Firefox')||match(/Chrome\/([\d.]+)/,'Chrome')||match(/Version\/([\d.]+).*Safari/,'Safari')||'Browser';
+  }
+  function safeFeedbackDiagnostics(){
+    return {
+      appVersion:VERSION,
+      browser:feedbackBrowserLabel(),
+      platform:String(navigator.userAgentData?.platform||navigator.platform||'Unknown').slice(0,60),
+      viewport:`${window.innerWidth}×${window.innerHeight}`,
+      screen:(window.screen?.width&&window.screen?.height)?`${window.screen.width}×${window.screen.height}`:'Unknown',
+      displayMode:isStandaloneDisplay()?'Installed PWA':'Browser',
+      theme:effectiveTheme(),
+      online:!!navigator.onLine,
+      cloudConfigured:!!cloudConfigured
+    };
+  }
+  function feedbackDiagnosticsText(){const d=safeFeedbackDiagnostics();return [`Ragnarok Tracker Diagnostics`,`Version: ${d.appVersion}`,`Browser: ${d.browser}`,`Platform: ${d.platform}`,`Viewport: ${d.viewport}`,`Screen: ${d.screen}`,`Mode: ${d.displayMode}`,`Theme: ${d.theme}`,`Online: ${d.online?'Yes':'No'}`,`Cloud configured: ${d.cloudConfigured?'Yes':'No'}`].join('\n');}
+  function updateFeedbackForm(){
+    const type=$('feedback-type')?.value||'bug',bug=type==='bug';
+    if($('feedback-bug-fields'))$('feedback-bug-fields').hidden=!bug;
+    if($('feedback-message-label'))$('feedback-message-label').firstChild.textContent=bug?'What happened?':'What would you like to share?';
+    setText('feedback-diagnostics-preview',feedbackDiagnosticsText());
+  }
+  function openFeedbackDialog(){
+    const d=$('feedback-dialog');if(!d)return;
+    if(!$('feedback-message').value){$('feedback-type').value='bug';$('feedback-area').value='dailies';}
+    setText('feedback-status','');updateFeedbackForm();if(!d.open)d.showModal();setTimeout(()=>$('feedback-message')?.focus(),50);
+  }
+  async function copyFeedbackDiagnostics(){try{await copyText(feedbackDiagnosticsText());toast('Diagnostics copied.','good')}catch(e){toast('Could not copy diagnostics.','bad')}}
+  async function submitFeedback(){
+    const type=$('feedback-type').value,area=$('feedback-area').value,message=$('feedback-message').value.trim(),steps=$('feedback-steps').value.trim(),expected=$('feedback-expected').value.trim(),contact=$('feedback-contact').value.trim(),website=$('feedback-website').value;
+    if(message.length<3){setText('feedback-status','Please add a little more detail before sending.');$('feedback-message').focus();return;}
+    const btn=$('feedback-submit');btn.disabled=true;btn.textContent='Sending…';setText('feedback-status','Sending privately…');
+    try{
+      const r=await fetch('/api/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type,area,message,steps:type==='bug'?steps:'',expected:type==='bug'?expected:'',contact,website,diagnostics:safeFeedbackDiagnostics()}),cache:'no-store',credentials:'same-origin'});
+      let data={};try{data=await r.json()}catch(e){}
+      if(!r.ok){if(r.status===429)throw new Error('You have sent several reports recently. Please try again later.');throw new Error(data.error||'Feedback could not be sent right now.');}
+      $('feedback-message').value='';$('feedback-steps').value='';$('feedback-expected').value='';$('feedback-contact').value='';$('feedback-website').value='';setText('feedback-status','Thanks! Your private feedback was sent to FatherJunJun.');toast('Thanks! Feedback sent. ❤️','good');setTimeout(()=>$('feedback-dialog')?.close('sent'),650);
+    }catch(e){setText('feedback-status',e.message);toast(e.message,'bad')}
+    finally{btn.disabled=false;btn.textContent='Send Feedback';}
   }
   function exportBackup(){ const blob=new Blob([JSON.stringify(app,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ragnarok-tracker-backup-${dayKey()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported.','good'); }
   async function importBackupFile(file){ try{const incoming=normalizeApp(JSON.parse(await file.text()));if(!confirm('Replace this device\'s tracker data with the imported backup?'))return;createSnapshot('Before importing backup');app=incoming;localStorage.setItem(STORAGE_KEY,JSON.stringify(app));dirtySinceCloud=true;renderAll();scheduleCloudPush();toast('Backup imported.','good')}catch(e){toast('That backup file could not be read.','bad')} }
@@ -1010,12 +1104,12 @@
     $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',openCopySetupDialog);$('copy-setup-from')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-to')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-submit')?.addEventListener('click',e=>{e.preventDefault();submitCopySetup()});$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
-    ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
+    ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));['open-feedback','footer-feedback','settings-feedback'].forEach(id=>$(id)?.addEventListener('click',openFeedbackDialog));$('feedback-type')?.addEventListener('change',updateFeedbackForm);$('feedback-copy-diagnostics')?.addEventListener('click',copyFeedbackDiagnostics);$('feedback-submit')?.addEventListener('click',e=>{e.preventDefault();submitFeedback()});$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
     const jumpTo=id=>{if($('settings-dialog')?.open)$('settings-dialog').close();requestAnimationFrame(()=>$(`${id}`)?.scrollIntoView({behavior:'smooth',block:'start'}))};
     $('settings-go-journal')?.addEventListener('click',()=>jumpTo('journal-card'));$('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
     $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
-    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)organizeMode=false;if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
+    const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-desktop-efficient','desktopEfficient'],['setting-collapse-completed-categories','collapseCompletedCategories'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)organizeMode=false;if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='collapseCompletedCategories')completedCategoryExpanded.clear();if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
     $('setting-theme').addEventListener('change',e=>{app.settings.theme=['system','light','dark'].includes(e.target.value)?e.target.value:'system';saveLocal('Theme changed');renderAll()});
     const themeMedia=window.matchMedia?.('(prefers-color-scheme: dark)');themeMedia?.addEventListener?.('change',()=>{if(app.settings.theme==='system')applyTheme()});
     $('restore-snapshot').addEventListener('click',()=>{renderSnapshots();$('snapshot-dialog').showModal()});$('export-backup').addEventListener('click',exportBackup);$('import-backup').addEventListener('click',()=>$('backup-file').click());$('backup-file').addEventListener('change',()=>{const f=$('backup-file').files?.[0];if(f)importBackupFile(f);$('backup-file').value=''});
