@@ -1,3 +1,13 @@
+# v5.6.1 — Launch Polish
+
+- Fixed nested modal scrolling so long dialogs use one intentional scrollbar instead of showing double scrollbars.
+- Feedback type and area now start unselected, preventing accidental Bug / Dailies categorization.
+- Bug-only reproduction fields stay hidden until Report a Bug is selected.
+- Added a graceful feedback fallback that keeps the user's text in place and can copy the full report plus safe diagnostics if submission is unavailable.
+- Added optional Getting Started and What's New dialogs without automatic popups or Beta/Early Access labeling.
+- Preserved private feedback storage, spam protection, responsive desktop efficiency, Adventure Journal, cloud sync, UTC+7 reset rules, and existing security protections.
+- Bumped application, API health, assets, and service-worker cache to v5.6.1.
+
 # v5.6.0 — Desktop Efficiency & Private Feedback
 
 - Expanded the desktop canvas and rebalanced the main dashboard so Dailies use more of the available horizontal space on normal and wide monitors.

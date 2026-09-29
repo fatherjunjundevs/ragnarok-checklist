@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.6.0"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.6.0">
+  <script src="/assets/theme-init.js?v=5.6.1"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.6.1">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -291,9 +291,9 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.6.0</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.6.1</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
-      <span><button class="footer-link" id="footer-feedback" type="button">Send Feedback</button> · <button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
+      <span><button class="footer-link" id="footer-getting-started" type="button">Getting Started</button> · <button class="footer-link" id="footer-whats-new" type="button">What’s New</button> · <button class="footer-link" id="footer-feedback" type="button">Send Feedback</button> · <button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
       <small>Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.</small>
       <span id="save-status">Saved locally</span>
@@ -415,17 +415,45 @@
     </form>
   </dialog>
 
+  <dialog id="getting-started-dialog" class="modal help-modal">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Quick guide</span><h3>Getting Started 🧭</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">The tracker is designed so you can start checking quests immediately. These are the main tools to know.</p>
+      <div class="help-steps">
+        <div><b>1</b><span><strong>Choose your character</strong><small>Create or switch characters from the character bar. Each character keeps separate Daily and Weekly progress.</small></span></div>
+        <div><b>2</b><span><strong>Track Dailies &amp; Weeklies</strong><small>Check quests as you finish them. Reset timing follows the game server: 5:00 AM UTC+7, with Weeklies resetting Monday.</small></span></div>
+        <div><b>3</b><span><strong>Use the Adventure Journal</strong><small>Save cards, equipment, Trade House targets, achievements, and long-term goals. Journal items do not reset automatically.</small></span></div>
+        <div><b>4</b><span><strong>Optional Cloud Sync</strong><small>Pair another device only if you want phone ↔ PC syncing. Keep your pairing code private like a password.</small></span></div>
+        <div><b>5</b><span><strong>Send Feedback</strong><small>Use Send Feedback for bugs or suggestions. Reports are private and are not visible to other players.</small></span></div>
+      </div>
+      <div class="modal-actions"><span class="spacer"></span><button class="primary" type="button" data-dialog-close>Got it</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="whats-new-dialog" class="modal help-modal">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Current release</span><h3>What’s New · v5.6.1 ✨</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <div class="release-notes">
+        <section><strong>Cleaner dialogs</strong><p>Long dialogs now use one intentional scrollbar instead of nested scrolling.</p></section>
+        <section><strong>Better feedback choices</strong><p>Feedback type and area now start unselected so reports are categorized deliberately.</p></section>
+        <section><strong>Feedback fallback</strong><p>If a report cannot be sent, you can copy the complete report and safe diagnostics without losing what you typed.</p></section>
+        <section><strong>v5.6 desktop improvements</strong><p>Responsive two-column Dailies, Jump To navigation, completed-category collapsing, and denser Compact mode remain available on larger screens.</p></section>
+      </div>
+      <div class="modal-actions"><span class="spacer"></span><button class="primary" type="button" data-dialog-close>Close</button></div>
+    </form>
+  </dialog>
+
   <dialog id="feedback-dialog" class="modal feedback-modal">
     <form method="dialog" id="feedback-form">
       <div class="modal-head"><div><span class="section-kicker">Help improve the tracker</span><h3>Send Feedback 💬</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
       <p class="muted">Reports are private and go only to the tracker owner. Other players cannot browse or read your submission.</p>
       <div class="feedback-private-note">🔒 Your characters, quest checks, Journal entries, notes, cloud pairing code, and tracker data are <strong>not</strong> attached automatically.</div>
       <div class="form-grid">
-        <label>Feedback type<select id="feedback-type"><option value="bug">🐛 Report a Bug</option><option value="suggestion">💡 Suggest an Improvement</option><option value="general">⭐ General Feedback</option></select></label>
-        <label>Area<select id="feedback-area"><option value="dailies">Dailies</option><option value="weeklies">Weeklies</option><option value="journal">Adventure Journal</option><option value="characters">Characters</option><option value="layout">Layout / Display</option><option value="mobile">Mobile / Installed App</option><option value="cloud">Cloud Sync</option><option value="other">Other</option></select></label>
+        <label>Feedback type<select id="feedback-type" required><option value="" selected disabled>Choose feedback type…</option><option value="bug">🐛 Report a Bug</option><option value="suggestion">💡 Suggest an Improvement</option><option value="general">⭐ General Feedback</option></select></label>
+        <label>Area<select id="feedback-area" required><option value="" selected disabled>Choose an area…</option><option value="dailies">Dailies</option><option value="weeklies">Weeklies</option><option value="journal">Adventure Journal</option><option value="characters">Characters</option><option value="layout">Layout / Display</option><option value="mobile">Mobile / Installed App</option><option value="cloud">Cloud Sync</option><option value="other">Other</option></select></label>
       </div>
       <label id="feedback-message-label">What happened?<textarea id="feedback-message" rows="5" maxlength="3000" required placeholder="Tell me what you noticed…"></textarea></label>
-      <div id="feedback-bug-fields">
+      <div id="feedback-bug-fields" hidden>
         <label>Steps to reproduce <span class="optional-label">optional</span><textarea id="feedback-steps" rows="3" maxlength="2000" placeholder="1. I opened… 2. I clicked… 3. Then…"></textarea></label>
         <label>What did you expect instead? <span class="optional-label">optional</span><textarea id="feedback-expected" rows="2" maxlength="1500" placeholder="I expected…"></textarea></label>
       </div>
@@ -438,6 +466,7 @@
         <button type="button" id="feedback-copy-diagnostics">📋 Copy diagnostics</button>
       </details>
       <div id="feedback-status" class="feedback-status" role="status" aria-live="polite"></div>
+      <div id="feedback-fallback" class="feedback-fallback" hidden><strong>Couldn’t send right now?</strong><span>Your report stays in this form. Copy it and send it to FatherJunJun through your usual community channel.</span><button type="button" id="feedback-copy-report">📋 Copy full report</button></div>
       <div class="modal-actions"><button type="button" data-dialog-close>Cancel</button><span class="spacer"></span><button class="primary" type="button" id="feedback-submit">Send Feedback</button></div>
     </form>
   </dialog>
@@ -476,12 +505,12 @@
       </section>
       <section class="settings-section">
         <div class="settings-section-head"><span aria-hidden="true">🧰</span><div><h4>Data &amp; tools</h4><p>Jump directly to cloud sync, backups, or reminder controls.</p></div></div>
-        <div class="settings-shortcuts"><button type="button" id="settings-feedback">💬 Send Feedback</button><button type="button" id="settings-go-journal">📖 Adventure Journal</button><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
+        <div class="settings-shortcuts"><button type="button" id="settings-getting-started">🧭 Getting Started</button><button type="button" id="settings-whats-new">✨ What’s New</button><button type="button" id="settings-feedback">💬 Send Feedback</button><button type="button" id="settings-go-journal">📖 Adventure Journal</button><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
       </section>
       <section class="settings-section settings-about-section">
         <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
         <div class="about-settings">
-          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.6.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.6.1 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
           <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
         </div>
       </section>
@@ -540,6 +569,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.6.0" defer></script>
+  <script src="/assets/app.js?v=5.6.1" defer></script>
 </body>
 </html>
