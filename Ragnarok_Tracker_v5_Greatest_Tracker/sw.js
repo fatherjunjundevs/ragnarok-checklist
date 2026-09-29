@@ -1,4 +1,4 @@
-const CACHE = 'rtnw-tracker-v5.6.1';
+const CACHE = 'rtnw-tracker-v5.6.1-fluid-grid-hotfix';
 const CORE = [
   '/', '/index.html', '/privacy.html', '/manifest.webmanifest',
   '/assets/theme-init.js?v=5.6.1', '/assets/app.css?v=5.6.1', '/assets/app.js?v=5.6.1',
