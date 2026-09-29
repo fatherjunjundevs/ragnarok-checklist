@@ -5,6 +5,7 @@ const MAX_REQUEST_BYTES = 800_000;
 const MAX_PROFILES = 50;
 const MAX_TASKS_PER_KIND = 500;
 const MAX_TOTAL_TASKS = 10_000;
+const MAX_JOURNAL_ITEMS = 500;
 const ROOM_RE = /^[a-z0-9-]{8,64}$/i;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -108,6 +109,23 @@ function validateTask(task) {
   if (task.completedAt !== null && task.completedAt !== undefined && !isIsoDate(task.completedAt)) return false;
   return true;
 }
+function validateJournalEntry(entry) {
+  if (!isObject(entry)) return false;
+  if (!isString(entry.id, 1, 128) || !isString(entry.title, 1, 100)) return false;
+  if (!['inbox','need','goal','trade','dream'].includes(entry.type)) return false;
+  if (typeof entry.profileId !== 'string' || entry.profileId.length > 128) return false;
+  if (!Number.isInteger(entry.current) || entry.current < 0 || entry.current > 999) return false;
+  if (!Number.isInteger(entry.target) || entry.target < 1 || entry.target > 999 || entry.current > entry.target) return false;
+  if (!Number.isInteger(entry.priority) || entry.priority < 0 || entry.priority > 3) return false;
+  if (!isString(entry.targetPrice, 0, 80) || !isString(entry.note, 0, 500)) return false;
+  if (!Number.isInteger(entry.durationMin) || entry.durationMin < 1 || entry.durationMin > 240) return false;
+  if (typeof entry.pinned !== 'boolean' || typeof entry.done !== 'boolean') return false;
+  if (entry.done !== (entry.current >= entry.target)) return false;
+  if (entry.done && entry.pinned) return false;
+  if (!isIsoDate(entry.createdAt) || !isIsoDate(entry.updatedAt)) return false;
+  if (entry.completedAt !== null && entry.completedAt !== undefined && !isIsoDate(entry.completedAt)) return false;
+  return true;
+}
 function validateProfile(profile) {
   if (!isObject(profile)) return false;
   if (!isString(profile.id, 1, 128) || !isString(profile.name, 1, 40)) return false;
@@ -169,6 +187,13 @@ function validateState(state) {
   if (!state.profiles.every(validateProfile)) return 'Tracker profile data is invalid.';
   const profileIds = new Set(state.profiles.map(p => p.id));
   if (profileIds.size !== state.profiles.length) return 'Tracker profile IDs are invalid.';
+  if ('journal' in state) {
+    if (!Array.isArray(state.journal) || state.journal.length > MAX_JOURNAL_ITEMS) return 'Adventure Journal data is invalid.';
+    if (!state.journal.every(validateJournalEntry)) return 'Adventure Journal data is invalid.';
+    const journalIds = new Set(state.journal.map(entry => entry.id));
+    if (journalIds.size !== state.journal.length) return 'Adventure Journal IDs are invalid.';
+    if (state.journal.some(entry => entry.profileId && !profileIds.has(entry.profileId))) return 'Adventure Journal character assignment is invalid.';
+  }
   const totalTasks = state.profiles.reduce((n, p) => n + p.daily.length + p.weekly.length, 0);
   if (totalTasks > MAX_TOTAL_TASKS) return 'Tracker contains too many tasks.';
   if (!isString(state.activeProfileId, 1, 128) || !profileIds.has(state.activeProfileId)) return 'Active profile is invalid.';
