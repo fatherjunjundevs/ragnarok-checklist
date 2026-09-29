@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.4.1';
+  const VERSION = '5.4.3';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -127,7 +127,7 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
@@ -382,67 +382,208 @@
     if(drag)drag.targetList=null;
   }
   function captureDragRowPositions(lists){
-    const positions=new Map();lists.filter(Boolean).forEach(list=>$$('.task-row:not(.drag-source)',list).forEach(row=>positions.set(row,row.getBoundingClientRect().top)));return positions;
+    const positions=new Map();
+    lists.filter(Boolean).forEach(list=>$$('.task-row:not(.drag-source)',list).forEach(row=>positions.set(row,row.getBoundingClientRect().top)));
+    return positions;
   }
   function animateDragReflow(before,lists){
     if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
     requestAnimationFrame(()=>lists.filter(Boolean).forEach(list=>$$('.task-row:not(.drag-source)',list).forEach(row=>{
-      const oldTop=before.get(row);if(oldTop===undefined)return;const dy=oldTop-row.getBoundingClientRect().top;if(Math.abs(dy)<1)return;
-      try{row.__dragReflowAnimation?.cancel?.();row.__dragReflowAnimation=row.animate([{transform:`translate3d(0,${dy}px,0)`},{transform:'translate3d(0,0,0)'}],{duration:135,easing:'cubic-bezier(.2,.8,.2,1)'});}catch(_){}
+      const oldTop=before.get(row);if(oldTop===undefined)return;
+      const dy=oldTop-row.getBoundingClientRect().top;if(Math.abs(dy)<1.5)return;
+      try{
+        row.__dragReflowAnimation?.cancel?.();
+        row.__dragReflowAnimation=row.animate(
+          [{transform:`translate3d(0,${dy}px,0)`},{transform:'translate3d(0,0,0)'}],
+          {duration:88,easing:'cubic-bezier(.2,.82,.2,1)'}
+        );
+      }catch(_){}
     })));
   }
   function moveDropSlot(list,y){
     if(!drag||!list)return;
-    if(drag.targetList!==list){clearDragTarget();drag.targetList=list;list.closest('.category-block')?.classList.add('drag-drop-active');}
+    if(drag.targetList!==list){
+      clearDragTarget();
+      drag.targetList=list;
+      list.closest('.category-block')?.classList.add('drag-drop-active');
+    }
     const rows=$$('.task-row:not(.drag-source)',list);let before=null;
-    for(const row of rows){const r=row.getBoundingClientRect();if(y<r.top+r.height*.5){before=row;break;}}
+    for(const row of rows){
+      const r=row.getBoundingClientRect();
+      if(y<r.top+r.height*.5){before=row;break;}
+    }
     const oldList=drag.slot.parentElement?.classList.contains('task-list')?drag.slot.parentElement:null;
     const alreadyThere=before ? (oldList===list&&drag.slot.nextSibling===before) : (oldList===list&&drag.slot===list.lastElementChild);
     if(alreadyThere)return;
     const affected=[...new Set([oldList,list].filter(Boolean))],positions=captureDragRowPositions(affected);
-    if(before)list.insertBefore(drag.slot,before);else list.append(drag.slot);animateDragReflow(positions,affected);
+    if(before)list.insertBefore(drag.slot,before);else list.append(drag.slot);
+    animateDragReflow(positions,affected);
   }
   function dragScrollSpeed(y){
-    const edge=Math.min(110,Math.max(72,innerHeight*.13));
-    if(y<edge)return -Math.ceil((edge-y)/edge*18);
-    if(y>innerHeight-edge)return Math.ceil((y-(innerHeight-edge))/edge*18);
+    const edge=Math.min(112,Math.max(76,innerHeight*.135));
+    if(y<edge)return -Math.ceil((edge-y)/edge*16);
+    if(y>innerHeight-edge)return Math.ceil((y-(innerHeight-edge))/edge*16);
     return 0;
   }
   function runDragFrame(){
     if(!drag)return;
     drag.frame=0;
     const x=drag.clientX,y=drag.clientY;
-    const maxX=Math.max(6,innerWidth-drag.ghostWidth-6),maxY=Math.max(6,innerHeight-drag.ghostHeight-6);
-    const gx=clamp(x-drag.offsetX,6,maxX),gy=clamp(y-drag.offsetY,6,maxY);
-    drag.ghost.style.transform=`translate3d(${Math.round(gx)}px,${Math.round(gy)}px,0) scale(1.025) rotate(.18deg)`;
+    const maxLeft=Math.max(6,innerWidth-drag.ghostWidth-6),maxTop=Math.max(6,innerHeight-drag.ghostHeight-6);
+    const left=clamp(x-drag.offsetX,6,maxLeft),top=clamp(y-drag.offsetY,6,maxTop);
+    const dx=left-drag.baseX,dy=top-drag.baseY;
+
+    // Stay directly attached to the latest pointer sample. The shell itself is
+    // fixed at the source row before it is painted, so a delayed transform can
+    // never make the card flash in from the top of the viewport.
+    drag.renderDX=dx;drag.renderDY=dy;
+    drag.shell.style.transform=`translate3d(${dx.toFixed(2)}px,${dy.toFixed(2)}px,0)`;
+
     const speed=dragScrollSpeed(y);
-    if(speed)scrollBy(0,speed);
-    const list=dragListAtPoint(x,y);if(list)moveDropSlot(list,y);
+    if(speed)window.scrollBy(0,speed);
+
+    if(drag.layoutDirty||speed){
+      const list=dragListAtPoint(x,y);
+      const cardCenterY=y+(drag.ghostHeight/2-drag.offsetY);
+      if(list)moveDropSlot(list,cardCenterY);
+      drag.layoutDirty=false;
+    }
+
     if(speed&&drag)drag.frame=requestAnimationFrame(runDragFrame);
   }
   function queueDragFrame(x,y){
-    if(!drag)return;drag.clientX=x;drag.clientY=y;if(!drag.frame)drag.frame=requestAnimationFrame(runDragFrame);
+    if(!drag)return;
+    drag.clientX=x;drag.clientY=y;drag.layoutDirty=true;
+    if(!drag.frame)drag.frame=requestAnimationFrame(runDragFrame);
   }
   function startDrag(e,kind,id){
-    if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();clearTextSelection();
-    const row=e.currentTarget.closest('.task-row'),rect=row.getBoundingClientRect();if(!row||!rect.width)return;
-    const slot=document.createElement('li');slot.className='drag-drop-slot';slot.style.height=`${Math.max(44,rect.height)}px`;slot.setAttribute('aria-hidden','true');row.after(slot);
-    const ghost=row.cloneNode(true);ghost.classList.remove('planner-highlight','drag-source');ghost.classList.add('drag-floating');ghost.style.width=`${rect.width}px`;ghost.style.height=`${rect.height}px`;ghost.setAttribute('aria-hidden','true');ghost.querySelectorAll('.favorite-btn,.edit-task,.task-counter,.quest-details').forEach(x=>x.remove());ghost.querySelectorAll('button,input,summary').forEach(x=>{x.tabIndex=-1;if('disabled'in x)x.disabled=true});document.body.append(ghost);
-    row.classList.add('drag-source');document.body.classList.add('drag-active');
-    drag={kind,id,row,slot,ghost,handle:e.currentTarget,pointerId:e.pointerId,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,ghostWidth:rect.width,ghostHeight:rect.height,clientX:e.clientX,clientY:e.clientY,frame:0,targetList:row.closest('.task-list')};
+    if(!canDrag()||(e.pointerType==='mouse'&&e.button!==0))return;
+    e.preventDefault();clearTextSelection();
+    const row=e.currentTarget.closest('.task-row');
+    if(!row)return;
+    const rect=row.getBoundingClientRect();
+    if(!rect.width)return;
+
+    const slot=document.createElement('li');
+    slot.className='drag-drop-slot';
+    slot.style.height=`${Math.max(44,rect.height)}px`;
+    slot.setAttribute('aria-hidden','true');
+    row.after(slot);
+
+    const shell=document.createElement('div');
+    shell.className='drag-floating-shell';
+    shell.style.width=`${rect.width}px`;
+    shell.style.height=`${rect.height}px`;
+    shell.setAttribute('aria-hidden','true');
+
+    const ghost=row.cloneNode(true);
+    ghost.classList.remove('planner-highlight','drag-source');
+    ghost.classList.add('drag-floating-card');
+    ghost.style.width='100%';
+    ghost.style.height='100%';
+    ghost.querySelectorAll('.favorite-btn,.edit-task,.task-counter,.quest-details').forEach(x=>x.remove());
+    ghost.querySelectorAll('button,input,summary').forEach(x=>{x.tabIndex=-1;if('disabled'in x)x.disabled=true});
+    shell.append(ghost);
+
+    const startX=rect.left,startY=rect.top;
+    // Use real fixed coordinates as the immutable pickup origin. This provides
+    // a browser-independent fallback even before the compositor sees a transform.
+    shell.style.left=`${startX.toFixed(2)}px`;
+    shell.style.top=`${startY.toFixed(2)}px`;
+    shell.style.transform='translate3d(0,0,0)';
+    document.body.append(shell);
+
+    row.classList.add('drag-source');
+    document.body.classList.add('drag-active');
+    document.documentElement.classList.add('drag-active-root');
+
+    drag={
+      kind,id,row,slot,shell,ghost,handle:e.currentTarget,pointerId:e.pointerId,
+      pointerType:e.pointerType||'mouse',
+      offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,
+      ghostWidth:rect.width,ghostHeight:rect.height,
+      clientX:e.clientX,clientY:e.clientY,
+      baseX:startX,baseY:startY,renderDX:0,renderDY:0,
+      frame:0,layoutDirty:true,targetList:row.closest('.task-list')
+    };
     drag.targetList?.closest('.category-block')?.classList.add('drag-drop-active');
-    try{e.currentTarget.setPointerCapture?.(e.pointerId)}catch(_){}queueDragFrame(e.clientX,e.clientY);
+    try{e.currentTarget.setPointerCapture?.(e.pointerId)}catch(_){}
+
+    requestAnimationFrame(()=>{if(drag?.ghost===ghost)ghost.classList.add('is-lifted')});
+    queueDragFrame(e.clientX,e.clientY);
   }
   function dragMove(e){
-    if(!drag||drag.pointerId!==e.pointerId)return;e.preventDefault();clearTextSelection();queueDragFrame(e.clientX,e.clientY);
+    if(!drag||drag.pointerId!==e.pointerId)return;
+    e.preventDefault();clearTextSelection();
+    const samples=e.getCoalescedEvents?.();
+    const sample=samples?.length?samples[samples.length-1]:e;
+    queueDragFrame(sample.clientX,sample.clientY);
   }
   function endDrag(e){
     if(!drag||drag.pointerId!==e.pointerId)return;
-    const current=drag;drag=null;if(current.frame)cancelAnimationFrame(current.frame);try{current.handle.releasePointerCapture?.(e.pointerId)}catch(_){}
-    current.slot.parentNode?.insertBefore(current.row,current.slot);current.slot.remove();current.ghost?.remove();current.row.classList.remove('drag-source');current.targetList?.closest('.category-block')?.classList.remove('drag-drop-active');document.body.classList.remove('drag-active');
-    const {kind,id}=current,p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set(),reordered=[];$$(`.task-list[data-kind="${kind}"]`).forEach(list=>{$$('.task-row',list).forEach(row=>{const t=map.get(row.dataset.taskId);if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}})});p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];saveLocal('Quest order changed');renderKind(kind);renderSessionPlanner();requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus());
+    const current=drag;
+    drag=null;
+    if(current.frame)cancelAnimationFrame(current.frame);
+    try{current.handle.releasePointerCapture?.(e.pointerId)}catch(_){}
+
+    const slotRect=current.slot.getBoundingClientRect();
+    const dropX=slotRect.left+(slotRect.width-current.ghostWidth)/2;
+    const dropY=slotRect.top+(slotRect.height-current.ghostHeight)/2;
+    const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    const finalize=()=>{
+      if(current.finished)return;
+      current.finished=true;
+      current.slot.parentNode?.insertBefore(current.row,current.slot);
+      current.slot.remove();
+      current.shell?.remove();
+      current.row.classList.remove('drag-source');
+      current.targetList?.closest('.category-block')?.classList.remove('drag-drop-active');
+      document.body.classList.remove('drag-active');
+      document.documentElement.classList.remove('drag-active-root');
+
+      const {kind,id}=current,p=active(),map=new Map(p[kind].map(t=>[t.id,t])),visibleIds=new Set(),reordered=[];
+      $$(`.task-list[data-kind="${kind}"]`).forEach(list=>{
+        $$('.task-row',list).forEach(row=>{
+          const t=map.get(row.dataset.taskId);
+          if(t){t.category=list.dataset.category;touch(t);reordered.push(t);visibleIds.add(t.id)}
+        });
+      });
+      p[kind]=[...reordered,...p[kind].filter(t=>!visibleIds.has(t.id))];
+      saveLocal('Quest order changed');
+      renderKind(kind);
+      renderSessionPlanner();
+      requestAnimationFrame(()=>document.querySelector(`[data-task-id="${CSS.escape(id)}"] .drag-handle`)?.focus());
+    };
+
+    current.ghost?.classList.remove('is-lifted');
+    current.ghost?.classList.add('is-dropping');
+
+    if(reduced||!current.shell){
+      finalize();
+      return;
+    }
+
+    current.shell.classList.add('is-dropping');
+    current.shell.getBoundingClientRect();
+    current.shell.style.transition='transform 115ms cubic-bezier(.2,.82,.22,1)';
+    const finish=()=>finalize();
+    current.shell.addEventListener('transitionend',finish,{once:true});
+    requestAnimationFrame(()=>{
+      current.shell.style.transform=`translate3d(${(dropX-current.baseX).toFixed(2)}px,${(dropY-current.baseY).toFixed(2)}px,0)`;
+    });
+    setTimeout(finish,155);
   }
-  function keyboardMove(e,kind,id){if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveLocal('Quest order changed');renderKind(kind);renderSessionPlanner();}
+  function keyboardMove(e,kind,id){
+    if(!canDrag()||!['ArrowUp','ArrowDown'].includes(e.key))return;
+    e.preventDefault();
+    const arr=active()[kind],i=arr.findIndex(t=>t.id===id),j=e.key==='ArrowUp'?i-1:i+1;
+    if(i<0||j<0||j>=arr.length)return;
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+    saveLocal('Quest order changed');
+    renderKind(kind);
+    renderSessionPlanner();
+  }
 
   function openTaskDialog(kind,id=null){
     const task=id?active()[kind].find(t=>t.id===id):null;$('task-id').value=task?.id||'';$('task-kind').value=kind;$('task-dialog-title').textContent=task?'Edit quest':`Add ${kind} quest`;$('task-dialog-kicker').textContent=kind==='daily'?'Daily quest':'Weekly quest';$('task-name').value=task?.name||'';$('task-note').value=task?.note||'';$('task-priority').value=String(task?.priority||0);$('task-favorite').checked=!!task?.favorite;$('task-delete').hidden=!task;
@@ -459,7 +600,45 @@
   function openCharacterDialog(id=null){ const p=id?app.profiles.find(x=>x.id===id):null;$('character-id').value=p?.id||'';$('character-dialog-title').textContent=p?'Edit character':'Add character';$('character-name').value=p?.name||'';$('character-class').value=p?.className||'';$('character-avatar').value=p?.avatar||'⚔️';$('character-accent').value=p?.accent||CHARACTER_ACCENT_NAMES[app.profiles.length%CHARACTER_ACCENT_NAMES.length]||'gold';$('character-copy-quests').checked=!p;$('character-copy-wrap').hidden=!!p;$('character-delete').hidden=!p||app.profiles.length===1;$('character-dialog').showModal();setTimeout(()=>$('character-name').focus(),40); }
   function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40),accent=normalizeAccent($('character-accent').value);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;p.accent=accent;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
   function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data?`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
-  function copySetup(){ if(app.profiles.length<2){toast('Add another character first.');return;}const targets=app.profiles.filter(p=>p.id!==app.activeProfileId);const msg=targets.map((p,i)=>`${i+1}. ${p.name}`).join('\n');const pick=prompt(`Copy quest setup FROM which character?\n\n${msg}`);if(pick===null)return;const src=targets[Number(pick)-1];if(!src){toast('That selection was not valid.','bad');return;}if(!confirm(`Replace ${active().name}'s quest setup with ${src.name}'s setup? Current completion checks will be cleared.`))return;createSnapshot('Before copying character setup');active().daily=src.daily.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null,updatedAt:nowISO()}));active().weekly=src.weekly.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null,updatedAt:nowISO()}));saveLocal('Character quest setup copied');renderAll();toast(`Copied ${src.name}'s quest setup.`,'good'); }
+  function populateCharacterSelect(select,selectedId){
+    select.replaceChildren();
+    app.profiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.avatar} ${p.name}${p.className?` · ${p.className}`:''}`;select.append(o)});
+    if(app.profiles.some(p=>p.id===selectedId))select.value=selectedId;
+  }
+  function updateCopySetupPreview(){
+    const from=$('copy-setup-from'),to=$('copy-setup-to'),button=$('copy-setup-submit');
+    if(!from||!to)return;
+    const src=app.profiles.find(p=>p.id===from.value),dest=app.profiles.find(p=>p.id===to.value),same=!!src&&!!dest&&src.id===dest.id;
+    if(button)button.disabled=!src||!dest||same;
+    const preview=$('copy-setup-preview');
+    if(!preview)return;
+    if(!src||!dest){preview.textContent='Choose a source and destination character.';return;}
+    if(same){preview.innerHTML='<strong>Choose two different characters.</strong><span>The source and destination cannot be the same.</span>';return;}
+    preview.innerHTML=`<strong>${escapeHTML(src.name)} → ${escapeHTML(dest.name)}</strong><span>${src.daily.length} daily + ${src.weekly.length} weekly quests will replace ${escapeHTML(dest.name)}'s current quest setup.</span>`;
+  }
+  function openCopySetupDialog(){
+    if(app.profiles.length<2){toast('Add another character first.');return;}
+    const from=$('copy-setup-from'),to=$('copy-setup-to'),dialog=$('copy-setup-dialog');
+    const fallback=app.profiles.find(p=>p.id!==app.activeProfileId)?.id||app.profiles[0].id;
+    populateCharacterSelect(from,app.activeProfileId);
+    populateCharacterSelect(to,fallback);
+    updateCopySetupPreview();
+    if(dialog&&!dialog.open)dialog.showModal();
+  }
+  function submitCopySetup(){
+    const src=app.profiles.find(p=>p.id===$('copy-setup-from')?.value),dest=app.profiles.find(p=>p.id===$('copy-setup-to')?.value);
+    if(!src||!dest){toast('Choose both characters.','bad');return;}
+    if(src.id===dest.id){toast('Choose a different destination character.','bad');return;}
+    createSnapshot(`Before copying ${src.name} setup to ${dest.name}`);
+    const cloneSetup=t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null,updatedAt:nowISO()});
+    dest.daily=src.daily.map(cloneSetup);
+    dest.weekly=src.weekly.map(cloneSetup);
+    touch(dest);
+    saveLocal('Character quest setup copied');
+    $('copy-setup-dialog')?.close('copied');
+    renderAll();
+    toast(`Copied ${src.name}'s setup to ${dest.name}. ${dest.name}'s completion progress was reset.`,'good');
+  }
 
   function renderSettings(){ $('setting-hide-completed').checked=!!app.settings.hideCompleted;$('setting-completed-bottom').checked=!!app.settings.completedBottom;$('setting-compact').checked=!!app.settings.compact;$('setting-ui-sounds').checked=!!app.settings.uiSounds;$('setting-autoplay').checked=!!app.settings.autoplay;$('setting-theme').value=['system','light','dark'].includes(app.settings.theme)?app.settings.theme:'system';$('setting-finish-auto').checked=!!app.settings.finishAuto;$('reminders-enabled').checked=!!app.settings.reminders;$('reminder-hours').value=String(app.settings.reminderHours||2);if($('session-minutes'))$('session-minutes').value=String(app.settings.sessionMinutes||15);setText('reminder-status',app.settings.reminders?'On':'Off');renderCategoryChips(); }
   function renderCategoryChips(){ const root=$('category-chips');root.replaceChildren();app.categories.forEach(c=>{const chip=document.createElement('span');chip.className='category-chip';chip.append(document.createTextNode(c));if(c!=='General'){const b=document.createElement('button');b.type='button';b.textContent='×';b.title=`Delete ${c}`;b.addEventListener('click',()=>deleteCategory(c));chip.append(b)}root.append(chip)}); }
@@ -641,7 +820,7 @@
     $$('[data-add-task]').forEach(b=>b.addEventListener('click',()=>openTaskDialog(b.dataset.addTask)));
     $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.progress=0;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKind(k);renderQuick();renderAllCharacters();renderSessionPlanner()}));
     $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
-    $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',copySetup);$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
+    $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',openCopySetupDialog);$('copy-setup-from')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-to')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-submit')?.addEventListener('click',e=>{e.preventDefault();submitCopySetup()});$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
     const jumpTo=id=>{if($('settings-dialog')?.open)$('settings-dialog').close();requestAnimationFrame(()=>$(`${id}`)?.scrollIntoView({behavior:'smooth',block:'start'}))};
