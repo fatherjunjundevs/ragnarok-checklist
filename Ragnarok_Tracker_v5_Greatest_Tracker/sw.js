@@ -1,4 +1,4 @@
-const CACHE = 'rtnw-tracker-v5.6.1-fluid-grid-hotfix';
+const CACHE = 'rtnw-tracker-v5.6.1-admin-phase1';
 const CORE = [
   '/', '/index.html', '/privacy.html', '/manifest.webmanifest',
   '/assets/theme-init.js?v=5.6.1', '/assets/app.css?v=5.6.1', '/assets/app.js?v=5.6.1',
@@ -20,7 +20,7 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.pathname.startsWith('/api/') || url.pathname === '/feedback-admin.html') return;
 
   if (req.mode === 'navigate') {
     const cacheKey = url.pathname === '/' ? '/index.html' : url.pathname;

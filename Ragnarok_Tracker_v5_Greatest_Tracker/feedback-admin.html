@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Feedback Admin · Ragnarok: The New World Tracker</title>
+  <link rel="stylesheet" href="/assets/admin.css?v=1">
+</head>
+<body>
+  <main class="admin-shell">
+    <section id="login-view" class="login-card" hidden>
+      <div class="brand-mark">⚔️</div>
+      <p class="eyebrow">Private owner access</p>
+      <h1>Feedback Admin</h1>
+      <p class="muted">Sign in with the password for your authorized Supabase admin account.</p>
+      <form id="login-form">
+        <label>Admin password
+          <input id="admin-password" type="password" autocomplete="current-password" minlength="8" required>
+        </label>
+        <button id="login-submit" class="primary" type="submit">Sign in</button>
+        <p id="login-status" class="form-status" aria-live="polite"></p>
+      </form>
+      <a class="back-link" href="/">← Back to tracker</a>
+    </section>
+
+    <section id="dashboard-view" hidden>
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Ragnarok: The New World Tracker</p>
+          <h1>Feedback Dashboard</h1>
+          <p class="muted">Private reports submitted through the in-app feedback form.</p>
+        </div>
+        <div class="header-actions">
+          <button id="refresh-feedback" type="button">↻ Refresh</button>
+          <button id="logout" type="button">Sign out</button>
+        </div>
+      </header>
+
+      <section id="summary" class="summary-grid" aria-label="Feedback status summary"></section>
+
+      <section class="toolbar" aria-label="Feedback filters">
+        <label>Status
+          <select id="filter-status">
+            <option value="all">All statuses</option>
+            <option value="new">New</option>
+            <option value="reviewing">Reviewing</option>
+            <option value="planned">Planned</option>
+            <option value="fixed">Fixed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        <label>Type
+          <select id="filter-type">
+            <option value="all">All types</option>
+            <option value="bug">Bug</option>
+            <option value="suggestion">Suggestion</option>
+            <option value="general">General</option>
+          </select>
+        </label>
+        <label>Area
+          <select id="filter-area">
+            <option value="all">All areas</option>
+            <option value="dailies">Dailies</option>
+            <option value="weeklies">Weeklies</option>
+            <option value="journal">Adventure Journal</option>
+            <option value="characters">Characters</option>
+            <option value="layout">Layout / Display</option>
+            <option value="mobile">Mobile / Installed App</option>
+            <option value="cloud">Cloud Sync</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label class="search-field">Search
+          <input id="filter-search" type="search" placeholder="Search feedback…" autocomplete="off">
+        </label>
+      </section>
+
+      <div class="list-meta">
+        <strong id="result-count">0 reports</strong>
+        <span id="last-refreshed"></span>
+      </div>
+
+      <section id="feedback-list" class="feedback-list" aria-live="polite"></section>
+      <div id="empty-state" class="empty-state" hidden>No feedback matches these filters.</div>
+    </section>
+  </main>
+
+  <dialog id="feedback-dialog">
+    <form method="dialog" class="dialog-card">
+      <header class="dialog-head">
+        <div>
+          <p id="detail-reference" class="eyebrow"></p>
+          <h2 id="detail-title">Feedback</h2>
+          <p id="detail-meta" class="muted"></p>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Close">×</button>
+      </header>
+
+      <div class="detail-grid">
+        <section><h3>Message</h3><p id="detail-message" class="detail-text"></p></section>
+        <section id="steps-section"><h3>Steps to reproduce</h3><p id="detail-steps" class="detail-text"></p></section>
+        <section id="expected-section"><h3>Expected result</h3><p id="detail-expected" class="detail-text"></p></section>
+        <section id="contact-section"><h3>Optional contact</h3><p id="detail-contact" class="detail-text"></p></section>
+        <section><h3>Safe diagnostics</h3><pre id="detail-diagnostics"></pre></section>
+      </div>
+
+      <div class="admin-edit">
+        <label>Status
+          <select id="detail-status">
+            <option value="new">New</option>
+            <option value="reviewing">Reviewing</option>
+            <option value="planned">Planned</option>
+            <option value="fixed">Fixed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        <label>Private admin notes
+          <textarea id="detail-notes" rows="5" maxlength="5000" placeholder="Notes only you can see…"></textarea>
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button id="copy-report" type="button">Copy report</button>
+        <span id="detail-status-message" class="form-status" aria-live="polite"></span>
+        <span class="spacer"></span>
+        <button value="cancel">Close</button>
+        <button id="save-feedback" class="primary" type="button">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/assets/admin.js?v=1" defer></script>
+</body>
+</html>
