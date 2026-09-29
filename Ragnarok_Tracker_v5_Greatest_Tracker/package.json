@@ -1,7 +1,7 @@
 {
   "name": "ragnarok-new-world-tracker",
   "private": true,
-  "version": "5.4.1",
+  "version": "5.4.3",
   "engines": {
     "node": ">=22"
   }

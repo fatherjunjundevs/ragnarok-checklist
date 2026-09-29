@@ -1,3 +1,24 @@
+# v5.4.3 — Precise Drag & Character Copy
+
+- Anchored the floating drag shell with real fixed `left`/`top` coordinates at the source row, so the card cannot flash or fly in from the top even if a browser delays compositor transforms.
+- Removed drag-follow interpolation so the floating card stays directly attached to the latest mouse/touch position while still updating through `requestAnimationFrame`.
+- Uses the dragged card center for drop-slot decisions to make reordering feel more natural and reduce jumpy slot changes.
+- Replaced the browser-prompt Copy Setup flow with a proper character-to-character modal.
+- Copy Setup now explicitly shows **Copy from** and **Copy to**, previews the transfer, explains what is copied, and makes clear that destination completion progress resets.
+- Bumped application, API health, assets, and service-worker cache to v5.4.3.
+
+# v5.4.2 — Silky Organize Drag Polish
+
+- Fixed the iPhone/iPad one-frame jump where a dragged quest could briefly appear from the top-left before snapping under the finger.
+- Positioned the floating quest synchronously at its source row before the browser can paint it.
+- Split drag translation from the visual lift animation so scaling/shadows no longer fight pointer tracking.
+- Added light frame-to-frame interpolation for touch movement while keeping the card closely anchored to the finger.
+- Uses the latest coalesced pointer sample when available for smoother touch tracking.
+- Disabled smooth page scrolling during active drag so edge auto-scroll does not queue competing scroll animations.
+- Reduced drag-list layout work between pointer samples and shortened row reflow animation timing.
+- Added a short settle animation into the visible drop slot before the real quest row is restored.
+- Preserved v5.4.0 counters, planner, guidance, overview, cloud validation, and all existing v5.2 security protections.
+
 # v5.4.1 — Smooth Organize Drag Patch
 
 - Rebuilt Organize-mode dragging around a lightweight drop slot instead of moving the full quest row on every pointer event.

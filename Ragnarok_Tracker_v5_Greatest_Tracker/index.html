@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.4.1"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.4.1">
+  <script src="/assets/theme-init.js?v=5.4.3"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.4.3">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -268,7 +268,7 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.4.1</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.4.3</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
       <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
@@ -329,6 +329,21 @@
     </form>
   </dialog>
 
+  <dialog id="copy-setup-dialog" class="modal copy-setup-modal">
+    <form method="dialog" id="copy-setup-form">
+      <div class="modal-head"><div><span class="section-kicker">Character tools</span><h3>Copy Quest Setup</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">Choose exactly which character to copy from and which character should receive the setup.</p>
+      <div class="copy-setup-flow">
+        <label><span>Copy from</span><select id="copy-setup-from" aria-label="Source character"></select></label>
+        <div class="copy-setup-arrow" aria-hidden="true">→</div>
+        <label><span>Copy to</span><select id="copy-setup-to" aria-label="Destination character"></select></label>
+      </div>
+      <div id="copy-setup-preview" class="copy-setup-preview" aria-live="polite"></div>
+      <div class="copy-setup-note"><strong>What gets copied</strong><span>Daily and weekly quest names, categories, favorites, priorities, counter targets, duration estimates, and quest guidance.</span><strong>What does not get copied</strong><span>Completion progress. The destination character starts the copied setup unfinished.</span></div>
+      <div class="modal-actions"><button type="button" data-dialog-close>Cancel</button><span class="spacer"></span><button class="primary" type="button" id="copy-setup-submit">Copy Setup</button></div>
+    </form>
+  </dialog>
+
   <dialog id="history-dialog" class="modal wide">
     <form method="dialog">
       <div class="modal-head"><div><span class="section-kicker">Progress archive</span><h3>Completion History</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
@@ -378,7 +393,7 @@
       <section class="settings-section settings-about-section">
         <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
         <div class="about-settings">
-          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.4.1 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.4.3 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
           <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
         </div>
       </section>
@@ -437,6 +452,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.4.1" defer></script>
+  <script src="/assets/app.js?v=5.4.3" defer></script>
 </body>
 </html>
