@@ -1,3 +1,17 @@
+# v5.6.0 — Desktop Efficiency & Private Feedback
+
+- Expanded the desktop canvas and rebalanced the main dashboard so Dailies use more of the available horizontal space on normal and wide monitors.
+- Added an optional responsive two-column Daily category layout that activates only when the browser window is wide enough and automatically returns to one column in Organize mode.
+- Added a sticky desktop **Jump to** category bar with remaining counts for faster navigation through long Daily lists.
+- Added optional automatic collapsing for fully completed categories; players can temporarily expand completed groups without changing their manual category order.
+- Strengthened Compact mode on desktop with denser one-line quest rows while preserving usable click targets.
+- Added a private **Send Feedback** form for bugs, suggestions, and general feedback with optional contact information.
+- Added automatic safe diagnostics that exclude character names, quest/Journals, notes, pairing codes, and tracker state.
+- Added a server-only `/api/feedback` endpoint with same-origin enforcement, strict input limits, a honeypot, quiet database-backed rate limiting, and duplicate-submission throttling.
+- Added a private Supabase `tracker_feedback` table with Row Level Security and no public policies; other players cannot browse submitted reports.
+- Preserved Adventure Journal, silky completed grouping, precise Organize dragging, UTC+7 reset rules, music behavior, cloud sync, and existing v5.2 security protections.
+- Bumped application, API health, assets, and service-worker cache to v5.6.0.
+
 # v5.5.0 — Adventure Journal
 
 - Added a persistent **Adventure Journal** for build needs, achievements/goals, Trade House shopping, dream items, and quick notes that never reset automatically.

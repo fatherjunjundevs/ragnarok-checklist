@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.5.0"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.5.0">
+  <script src="/assets/theme-init.js?v=5.6.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.6.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -67,6 +67,7 @@
           <button class="ghost" id="theme-toggle" type="button" aria-label="Switch color theme">☾ Dark mode</button>
           <button class="ghost" id="open-settings" type="button">⚙ Settings</button>
           <button class="ghost" id="open-history" type="button">▦ History</button>
+          <button class="ghost" id="open-feedback" type="button">💬 Feedback</button>
           <button class="ghost support-hero-btn" id="open-support" type="button">☕ Support</button>
         </div>
       </div>
@@ -122,6 +123,8 @@
         <button class="toggle organize-toggle" id="toggle-organize" type="button" aria-pressed="false">↕ Organize</button>
       </div>
     </nav>
+
+    <nav class="category-jumpbar" id="daily-category-jump" aria-label="Jump to daily quest category" hidden></nav>
 
     <section class="dashboard" aria-label="Quest dashboard">
       <section class="quest-card" id="daily-card">
@@ -288,9 +291,9 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.5.0</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.6.0</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
-      <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
+      <span><button class="footer-link" id="footer-feedback" type="button">Send Feedback</button> · <button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
       <small>Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.</small>
       <span id="save-status">Saved locally</span>
@@ -412,6 +415,33 @@
     </form>
   </dialog>
 
+  <dialog id="feedback-dialog" class="modal feedback-modal">
+    <form method="dialog" id="feedback-form">
+      <div class="modal-head"><div><span class="section-kicker">Help improve the tracker</span><h3>Send Feedback 💬</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">Reports are private and go only to the tracker owner. Other players cannot browse or read your submission.</p>
+      <div class="feedback-private-note">🔒 Your characters, quest checks, Journal entries, notes, cloud pairing code, and tracker data are <strong>not</strong> attached automatically.</div>
+      <div class="form-grid">
+        <label>Feedback type<select id="feedback-type"><option value="bug">🐛 Report a Bug</option><option value="suggestion">💡 Suggest an Improvement</option><option value="general">⭐ General Feedback</option></select></label>
+        <label>Area<select id="feedback-area"><option value="dailies">Dailies</option><option value="weeklies">Weeklies</option><option value="journal">Adventure Journal</option><option value="characters">Characters</option><option value="layout">Layout / Display</option><option value="mobile">Mobile / Installed App</option><option value="cloud">Cloud Sync</option><option value="other">Other</option></select></label>
+      </div>
+      <label id="feedback-message-label">What happened?<textarea id="feedback-message" rows="5" maxlength="3000" required placeholder="Tell me what you noticed…"></textarea></label>
+      <div id="feedback-bug-fields">
+        <label>Steps to reproduce <span class="optional-label">optional</span><textarea id="feedback-steps" rows="3" maxlength="2000" placeholder="1. I opened… 2. I clicked… 3. Then…"></textarea></label>
+        <label>What did you expect instead? <span class="optional-label">optional</span><textarea id="feedback-expected" rows="2" maxlength="1500" placeholder="I expected…"></textarea></label>
+      </div>
+      <label>Discord / contact <span class="optional-label">optional</span><input id="feedback-contact" maxlength="160" autocomplete="off" placeholder="Only if you want a reply"></label>
+      <input class="feedback-honeypot" id="feedback-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <details class="feedback-diagnostics">
+        <summary>Safe diagnostics included automatically</summary>
+        <p>Only basic app/device information is included to help reproduce display and browser bugs.</p>
+        <pre id="feedback-diagnostics-preview"></pre>
+        <button type="button" id="feedback-copy-diagnostics">📋 Copy diagnostics</button>
+      </details>
+      <div id="feedback-status" class="feedback-status" role="status" aria-live="polite"></div>
+      <div class="modal-actions"><button type="button" data-dialog-close>Cancel</button><span class="spacer"></span><button class="primary" type="button" id="feedback-submit">Send Feedback</button></div>
+    </form>
+  </dialog>
+
   <dialog id="settings-dialog" class="modal wide">
     <form method="dialog" id="settings-form">
       <div class="modal-head"><div><span class="section-kicker">Tracker preferences</span><h3>Settings</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
@@ -419,7 +449,8 @@
         <div class="settings-section-head"><span aria-hidden="true">🎨</span><div><h4>Appearance</h4><p>Choose how the tracker looks and how much fits on screen.</p></div></div>
         <div class="settings-grid">
           <label class="setting-tile theme-setting"><span class="setting-icon" aria-hidden="true">◐</span><span><b>Color mode</b><small>Use light parchment, dark midnight, or follow this device.</small><select id="setting-theme" aria-label="Color theme"><option value="system">Device setting</option><option value="light">Light mode</option><option value="dark">Dark mode</option></select></span></label>
-          <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Fit more quests on screen.</small></span></label>
+          <label class="setting-tile"><input id="setting-compact" type="checkbox"><span><b>Compact quest rows</b><small>Use a denser one-line quest layout on larger screens.</small></span></label>
+          <label class="setting-tile"><input id="setting-desktop-efficient" type="checkbox"><span><b>Efficient desktop layout</b><small>Use two Daily category columns when the window has enough room.</small></span></label>
         </div>
       </section>
       <section class="settings-section">
@@ -427,6 +458,7 @@
         <div class="settings-grid">
           <label class="setting-tile"><input id="setting-hide-completed" type="checkbox"><span><b>Hide completed</b><small>Show only unfinished quests.</small></span></label>
           <label class="setting-tile"><input id="setting-completed-bottom" type="checkbox"><span><b>Group completed at bottom</b><small>Checked quests glide below a Completed divider. Reset restores your normal Organize order.</small></span></label>
+          <label class="setting-tile"><input id="setting-collapse-completed-categories" type="checkbox"><span><b>Collapse completed categories</b><small>Finished Daily and Weekly groups shrink automatically. You can expand them anytime.</small></span></label>
           <label class="setting-tile"><input id="setting-finish-auto" type="checkbox"><span><b>Suggest finish mode near reset</b><small>Highlight unfinished priorities in the final 2 hours.</small></span></label>
         </div>
       </section>
@@ -444,12 +476,12 @@
       </section>
       <section class="settings-section">
         <div class="settings-section-head"><span aria-hidden="true">🧰</span><div><h4>Data &amp; tools</h4><p>Jump directly to cloud sync, backups, or reminder controls.</p></div></div>
-        <div class="settings-shortcuts"><button type="button" id="settings-go-journal">📖 Adventure Journal</button><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
+        <div class="settings-shortcuts"><button type="button" id="settings-feedback">💬 Send Feedback</button><button type="button" id="settings-go-journal">📖 Adventure Journal</button><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
       </section>
       <section class="settings-section settings-about-section">
         <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
         <div class="about-settings">
-          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.5.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.6.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
           <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
         </div>
       </section>
@@ -508,6 +540,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.5.0" defer></script>
+  <script src="/assets/app.js?v=5.6.0" defer></script>
 </body>
 </html>
