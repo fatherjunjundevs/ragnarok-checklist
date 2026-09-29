@@ -1,4 +1,4 @@
-# Ragnarok: The New World Tracker v5.6.0
+# Ragnarok: The New World Tracker v5.6.1
 
 A mobile-first / desktop-friendly PWA quest tracker for a UTC+7 Ragnarok server with daily reset at 5:00 AM and weekly reset Monday at 5:00 AM.
 
@@ -141,6 +141,14 @@ v5.2.1 uses direct HTML audio playback for the Prontera theme so user taps can s
 The included reminder system can show browser/PWA notifications while the tracker is active and when the platform keeps its service worker available. Guaranteed scheduled background push while the app is fully closed would require a push-subscription backend and is not claimed by this version.
 
 ## Recent fixes
+
+### v5.6.1 — Launch Polish
+
+- Fixed double scrollbars in long dialogs by keeping scrolling inside one intentional modal content surface.
+- Feedback type and area now require deliberate selection instead of defaulting to Bug / Dailies.
+- Bug-only reproduction fields remain hidden until Bug is selected.
+- Added a copyable fallback report if private feedback submission is temporarily unavailable.
+- Added optional Getting Started and What’s New help dialogs with no automatic popup or Beta/Early Access labeling.
 
 ### v5.6.0 — Desktop Efficiency & Private Feedback
 
