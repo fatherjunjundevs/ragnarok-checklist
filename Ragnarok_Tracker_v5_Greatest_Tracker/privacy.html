@@ -8,13 +8,13 @@
   <meta name="author" content="FatherJunJun">
   <title>Privacy & Security | Ragnarok Tracker by FatherJunJun</title>
   <link rel="canonical" href="https://ragnarok-checklist.vercel.app/privacy.html">
-  <script src="/assets/theme-init.js?v=5.4.4"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.4.4">
+  <script src="/assets/theme-init.js?v=5.5.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.5.0">
 </head>
 <body>
   <main class="app-shell privacy-shell">
     <header class="privacy-hero">
-      <span class="eyebrow">FatherJunJun · v5.4.4</span>
+      <span class="eyebrow">FatherJunJun · v5.5.0</span>
       <h1>Privacy &amp; Security</h1>
       <p>This page explains what the tracker stores, what cloud sync sends to the server, how pairing codes work, and the security protections used by this unofficial fan-made project.</p>
       <div class="privacy-hero-actions">
@@ -27,14 +27,14 @@
       <article class="utility-card privacy-card">
         <span class="section-kicker">On your device</span>
         <h2>Local data</h2>
-        <p>The tracker saves your characters, quest checks, run counters, duration estimates, optional quest guidance (such as prerequisites, locations, rewards, and notes), priorities, settings, history, and local restore snapshots in your browser so the app can work offline.</p>
+        <p>The tracker saves your characters, quest checks, run counters, duration estimates, optional quest guidance, Adventure Journal entries (including build needs, goals, Trade House targets, dream items, prices, notes, and progress), priorities, settings, history, and local restore snapshots in your browser so the app can work offline.</p>
         <p>If cloud sync is connected, the browser also keeps the room ID and pairing secret needed for automatic synchronization. That credential is kept separately from tracker backups and is not included in exported tracker JSON.</p>
       </article>
 
       <article class="utility-card privacy-card">
         <span class="section-kicker">Optional</span>
         <h2>Cloud sync</h2>
-        <p>Cloud sync sends your tracker state to the tracker server, which stores it in Supabase together with a room ID, revision number, and update timestamp.</p>
+        <p>Cloud sync sends your tracker state, including Adventure Journal entries when you use them, to the tracker server, which stores it in Supabase together with a room ID, revision number, and update timestamp.</p>
         <p>The server does <strong>not</strong> store the pairing secret itself. It stores a SHA-256 hash used to verify future sync requests.</p>
       </article>
 
@@ -93,9 +93,9 @@
     </section>
 
     <footer class="privacy-footer">
-      <strong>Ragnarok: The New World Tracker · v5.4.4 · Created by FatherJunJun</strong><br>
+      <strong>Ragnarok: The New World Tracker · v5.5.0 · Created by FatherJunJun</strong><br>
       Unofficial fan-made community project. Not affiliated with or endorsed by the game publisher or developer.<br>
-      Last updated: September 28, 2026 · <a href="/">Return to tracker</a>
+      Last updated: September 29, 2026 · <a href="/">Return to tracker</a>
     </footer>
   </main>
 </body>

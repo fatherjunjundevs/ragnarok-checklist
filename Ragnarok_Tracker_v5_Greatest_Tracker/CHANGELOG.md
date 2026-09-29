@@ -1,3 +1,16 @@
+# v5.5.0 — Adventure Journal
+
+- Added a persistent **Adventure Journal** for build needs, achievements/goals, Trade House shopping, dream items, and quick notes that never reset automatically.
+- Added one-tap **Quick Capture** to Inbox so players can save an idea while playing and organize it later.
+- Added Journal filters for All, Inbox, Needs, Goals, Trade House, Dreams, and Accomplished.
+- Added optional character assignment, quantity/progress targets, priorities, target price/budget, notes, duration estimates, and **Pin for today**.
+- Pinned Journal items can appear in the existing Short Session Planner alongside unfinished daily/weekly quests.
+- Completing a Journal target moves it into Accomplished while keeping it available for restoration or editing.
+- Added a mobile Journal destination plus a floating Quick Capture button for fast phone access.
+- Added strict cloud-sync validation for Journal data with no Supabase schema migration required.
+- Preserved v5.4.4 completed grouping, v5.4.3 precise drag/copy setup, UTC+7 reset logic, music behavior, and v5.2 security protections.
+- Bumped application, API health, assets, and service-worker cache to v5.5.0.
+
 # v5.4.4 — Silky Completed Grouping
 
 - Made completed-at-bottom grouping the everyday default for v5.4.4 while preserving the player's choice after the migration.

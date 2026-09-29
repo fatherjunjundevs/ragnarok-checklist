@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta id="theme-color-meta" name="theme-color" content="#10274b">
-  <meta name="description" content="Fan-made Ragnarok: The New World daily and weekly tracker created by FatherJunJun, with multi-character tracking, reset timers, history, reminders, backups, and optional cloud sync.">
+  <meta name="description" content="Fan-made Ragnarok: The New World daily and weekly tracker created by FatherJunJun, with multi-character tracking, reset timers, Adventure Journal, history, reminders, backups, and optional cloud sync.">
   <meta name="author" content="FatherJunJun">
   <meta property="og:title" content="Ragnarok: The New World Tracker | FatherJunJun">
   <meta property="og:description" content="Free fan-made daily and weekly Ragnarok tracker by FatherJunJun with multi-character tracking, reset timers, history, reminders, backups, and cloud sync.">
@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preload" as="image" href="/assets/prontera.webp">
-  <script src="/assets/theme-init.js?v=5.4.4"></script>
-  <link rel="stylesheet" href="/assets/app.css?v=5.4.4">
+  <script src="/assets/theme-init.js?v=5.5.0"></script>
+  <link rel="stylesheet" href="/assets/app.css?v=5.5.0">
 </head>
 <body>
   <div id="update-banner" class="update-banner" hidden>
@@ -194,6 +194,26 @@
       </aside>
     </section>
 
+
+    <section class="journal-card" id="journal-card" aria-labelledby="journal-title-heading">
+      <div class="journal-head">
+        <div>
+          <span class="section-kicker">Persistent adventure notes</span>
+          <h2 id="journal-title-heading">📖 Adventure Journal</h2>
+          <p>Cards, equipment, achievements, Trade House targets, and long-term dreams. Journal items never reset automatically.</p>
+        </div>
+        <div class="journal-head-actions"><span class="status-pill good" id="journal-summary">0 active · 0 accomplished</span><button type="button" id="journal-add-detailed">＋ Add details</button></div>
+      </div>
+      <div class="journal-quick-capture">
+        <span class="journal-quick-icon" aria-hidden="true">📥</span>
+        <label for="journal-quick-input"><strong>Quick Capture</strong><small>Save it now. Organize the details later.</small></label>
+        <input id="journal-quick-input" maxlength="100" autocomplete="off" placeholder="Need Marc card for crit build…">
+        <button class="primary" id="journal-quick-add" type="button">Add to Inbox</button>
+      </div>
+      <div class="journal-filter-bar" id="journal-filters" aria-label="Adventure Journal filters"></div>
+      <div class="journal-list" id="journal-list"></div>
+    </section>
+
     <section class="utility-grid">
       <article class="utility-card utility-feature-card" id="cloud-card">
         <div class="utility-title"><div><span class="section-kicker">Across devices</span><h3>☁ Cloud Sync</h3></div><span class="status-pill" id="cloud-status-pill">Checking…</span></div>
@@ -268,7 +288,7 @@
     </section>
 
     <footer class="footer">
-      <span><strong>Ragnarok: The New World Tracker · v5.4.4</strong></span>
+      <span><strong>Ragnarok: The New World Tracker · v5.5.0</strong></span>
       <span>Created with ☕ by <strong>FatherJunJun</strong></span>
       <span><button class="footer-link" id="footer-support" type="button">Support the Tracker</button> · <a href="https://buymeacoffee.com/FatherJunJun" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a> · <a href="/privacy.html">Privacy &amp; Security</a></span>
       <span>Daily reset 5:00 AM UTC+7 · Weekly reset Monday 5:00 AM UTC+7</span>
@@ -280,9 +300,11 @@
   <nav class="mobile-nav" aria-label="Quick mobile navigation">
     <button type="button" data-mobile-target="daily-card"><span aria-hidden="true">☀️</span><small>Today</small></button>
     <button type="button" data-mobile-target="weekly-card"><span aria-hidden="true">✦</span><small>Weekly</small></button>
+    <button type="button" data-mobile-target="journal-card"><span aria-hidden="true">📖</span><small>Journal</small></button>
     <button type="button" data-mobile-target="character-dock"><span aria-hidden="true">👤</span><small>Character</small></button>
     <button type="button" id="mobile-more"><span aria-hidden="true">☰</span><small>More</small></button>
   </nav>
+  <button class="journal-fab" id="journal-fab" type="button" aria-label="Quick capture to Adventure Journal"><span aria-hidden="true">＋</span><b>Journal</b></button>
 
   <audio id="theme-audio" loop preload="metadata" src="/assets/prontera.mp3"></audio>
 
@@ -311,6 +333,40 @@
       </details>
       <label class="checkline"><input type="checkbox" id="task-favorite"> Keep this quest as a favorite</label>
       <div class="modal-actions"><button type="button" class="danger" id="task-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" id="task-save" value="default">Save quest</button></div>
+    </form>
+  </dialog>
+
+
+  <dialog id="journal-quick-dialog" class="modal journal-quick-dialog">
+    <form method="dialog">
+      <div class="modal-head"><div><span class="section-kicker">Adventure Journal</span><h3>Quick Capture</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <p class="muted">Write it down and get back to the game. It will be saved to Inbox for your active character.</p>
+      <label>What do you want to remember?<input id="journal-quick-dialog-input" maxlength="100" autocomplete="off" placeholder="Need Hydra card, buy +10 weapon, finish achievement…"></label>
+      <div class="modal-actions"><button type="button" data-dialog-close>Cancel</button><span class="spacer"></span><button class="primary" type="button" id="journal-quick-dialog-save">Save to Inbox</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="journal-dialog" class="modal">
+    <form method="dialog" id="journal-form">
+      <div class="modal-head"><div><span class="section-kicker">Adventure Journal</span><h3 id="journal-dialog-title">Add Journal Item</h3></div><button class="icon-btn" type="button" data-dialog-close aria-label="Close">×</button></div>
+      <input type="hidden" id="journal-id">
+      <label>What are you tracking?<input id="journal-title" maxlength="100" required placeholder="Hydra Card, +10 weapon, Adventure Book achievement…"></label>
+      <div class="form-grid">
+        <label>Type<select id="journal-type"><option value="inbox">📥 Inbox / Quick Note</option><option value="need">🧰 Build Need</option><option value="goal">🏆 Goal / Achievement</option><option value="trade">🏪 Trade House</option><option value="dream">✨ Dream List</option></select></label>
+        <label>Character<select id="journal-profile"></select></label>
+      </div>
+      <div class="form-grid journal-number-grid">
+        <label>Current<input id="journal-current" type="number" min="0" max="999" value="0" inputmode="numeric"><small>How many / how much is done.</small></label>
+        <label>Target<input id="journal-target" type="number" min="1" max="999" value="1" inputmode="numeric"><small>Use 1 for a simple done/not-done item.</small></label>
+        <label>Estimated time<input id="journal-duration" type="number" min="1" max="240" value="10" inputmode="numeric"><small>Used when pinned to your short-session planner.</small></label>
+      </div>
+      <div class="form-grid">
+        <label>Priority<select id="journal-priority"><option value="0">Normal</option><option value="1">Low</option><option value="2">High</option><option value="3">Urgent</option></select></label>
+        <label>Target price / budget<input id="journal-price" maxlength="80" placeholder="e.g. 850k Zeny, under 8M"></label>
+      </div>
+      <label>Notes<textarea id="journal-note" rows="4" maxlength="500" placeholder="Build reason, seller notes, achievement steps, where to farm it…"></textarea></label>
+      <label class="checkline"><input type="checkbox" id="journal-pinned"> <span><strong>Pin for today</strong><small>Include this item in the Short Session Planner until completed.</small></span></label>
+      <div class="modal-actions"><button type="button" class="danger" id="journal-delete">Delete</button><span class="spacer"></span><button type="button" data-dialog-close>Cancel</button><button class="primary" type="button" id="journal-save">Save item</button></div>
     </form>
   </dialog>
 
@@ -388,12 +444,12 @@
       </section>
       <section class="settings-section">
         <div class="settings-section-head"><span aria-hidden="true">🧰</span><div><h4>Data &amp; tools</h4><p>Jump directly to cloud sync, backups, or reminder controls.</p></div></div>
-        <div class="settings-shortcuts"><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
+        <div class="settings-shortcuts"><button type="button" id="settings-go-journal">📖 Adventure Journal</button><button type="button" id="settings-go-cloud">☁ Cloud Sync</button><button type="button" id="settings-go-backups">↶ Backups</button><button type="button" id="settings-go-reminders">🔔 Reminders</button><a class="button-link" href="/privacy.html">🔒 Privacy &amp; Security</a></div>
       </section>
       <section class="settings-section settings-about-section">
         <div class="settings-section-head"><span aria-hidden="true">☕</span><div><h4>About</h4><p>Project information and ways to support or share the tracker.</p></div></div>
         <div class="about-settings">
-          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.4.4 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
+          <div><strong>Ragnarok: The New World Tracker</strong><span>Version 5.5.0 · Created by FatherJunJun</span><small>Unofficial fan-made community tracker.</small></div>
           <div class="utility-actions"><button type="button" id="settings-support">☕ Support the Tracker</button><a class="button-link" href="/CHANGELOG.md" target="_blank" rel="noopener noreferrer">View Changelog</a><button type="button" id="settings-share">↗ Share Tracker</button></div>
         </div>
       </section>
@@ -452,6 +508,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=5.4.4" defer></script>
+  <script src="/assets/app.js?v=5.5.0" defer></script>
 </body>
 </html>
