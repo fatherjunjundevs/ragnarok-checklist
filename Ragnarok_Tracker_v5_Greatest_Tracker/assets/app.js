@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.4.4';
+  const VERSION = '5.5.0';
   const SUPPORT_URL = 'https://buymeacoffee.com/FatherJunJun';
   const TRACKER_URL = 'https://ragnarok-checklist.vercel.app';
   const STORAGE_KEY = 'rtnw-tracker-v5';
@@ -28,6 +28,15 @@
   const CHARACTER_ACCENTS = {gold:'#e7bd6d',teal:'#5cb6aa',violet:'#a98ac8',rose:'#d67f9a',emerald:'#63b88b',sky:'#6fa8dc'};
   const CHARACTER_ACCENT_NAMES = Object.keys(CHARACTER_ACCENTS);
   const SESSION_MINUTES = [15,30,45,60,90,120];
+  const MAX_JOURNAL_ITEMS = 500;
+  const JOURNAL_TYPES = ['inbox','need','goal','trade','dream'];
+  const JOURNAL_META = {
+    inbox:{label:'Inbox',short:'Inbox',icon:'📥'},
+    need:{label:'Build Need',short:'Needs',icon:'🧰'},
+    goal:{label:'Goal',short:'Goals',icon:'🏆'},
+    trade:{label:'Trade House',short:'Trade',icon:'🏪'},
+    dream:{label:'Dream',short:'Dreams',icon:'✨'}
+  };
 
   const $ = id => document.getElementById(id);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -39,6 +48,7 @@
     return n.toLowerCase() === 'monster etermination' ? 'Monster Extermination' : n;
   };
   const uid = prefix => `${prefix}-${Date.now().toString(36)}-${cryptoRandom(6)}`;
+  function versionAtLeast(value,major,minor,patch){const m=String(value||'').match(/^(\d+)\.(\d+)\.(\d+)/);if(!m)return false;const v=m.slice(1).map(Number),target=[major,minor,patch];for(let i=0;i<3;i++){if(v[i]!==target[i])return v[i]>target[i]}return true;}
   function cryptoRandom(bytes = 16) {
     const a = new Uint8Array(bytes); crypto.getRandomValues(a);
     return [...a].map(x => x.toString(16).padStart(2,'0')).join('');
@@ -93,6 +103,47 @@
   }
   function toggleTaskComplete(task){return setTaskProgress(task,task.done?0:(task.target||1));}
   function taskHasGuidance(task){return !!(task.prerequisites||task.location||task.rewards||task.note);}
+  function journalTypeMeta(type){ return JOURNAL_META[JOURNAL_TYPES.includes(type)?type:'inbox']; }
+  function makeJournalEntry(title, extra={}, validProfileIds=null){
+    const target=clamp(Math.round(Number(extra.target)||1),1,999);
+    const hasCurrent=extra.current!==undefined&&extra.current!==null&&Number.isFinite(Number(extra.current));
+    let current=hasCurrent?Math.round(Number(extra.current)):(extra.done===true?target:0);
+    current=clamp(current,0,target);
+    let done=current>=target;
+    if(!hasCurrent&&extra.done===true){current=target;done=true;}
+    let profileId=typeof extra.profileId==='string'?extra.profileId:'';
+    if(validProfileIds&&profileId&&!validProfileIds.has(profileId))profileId='';
+    return {
+      id:typeof extra.id==='string'&&extra.id?extra.id:uid('journal'),
+      title:norm(title).slice(0,100),
+      type:JOURNAL_TYPES.includes(extra.type)?extra.type:'inbox',
+      profileId,
+      current,target,
+      priority:clamp(Math.round(Number(extra.priority)||0),0,3),
+      targetPrice:norm(extra.targetPrice).slice(0,80),
+      durationMin:clamp(Math.round(Number(extra.durationMin)||10),1,240),
+      note:norm(extra.note).slice(0,500),
+      pinned:extra.pinned===true&&!done,
+      done,
+      createdAt:extra.createdAt||nowISO(),
+      updatedAt:extra.updatedAt||nowISO(),
+      completedAt:done?(extra.completedAt||nowISO()):null
+    };
+  }
+  function normalizeJournalEntry(row, validProfileIds){
+    if(!row||typeof row!=='object')return null;
+    const title=norm(row.title).slice(0,100);if(!title)return null;
+    return makeJournalEntry(title,row,validProfileIds);
+  }
+  function setJournalProgress(entry,value){
+    const wasDone=!!entry.done;
+    entry.current=clamp(Math.round(Number(value)||0),0,entry.target||1);
+    entry.done=entry.current>=(entry.target||1);
+    if(entry.done&&!wasDone){entry.completedAt=nowISO();entry.pinned=false;}
+    else if(!entry.done)entry.completedAt=null;
+    entry.updatedAt=nowISO();app.meta.updatedAt=entry.updatedAt;app.meta.appVersion=VERSION;
+    return {wasDone,done:entry.done};
+  }
   function defaultTasks(kind){ return (kind==='daily'?DEFAULT_DAILY:DEFAULT_WEEKLY).map(([n,c],i)=>makeTask(n,c,{id:`${kind}-${i}`})); }
   function normalizeTask(row, kind){
     if(!row || typeof row !== 'object') return null; const name=cleanName(row.name); if(!name) return null;
@@ -127,12 +178,12 @@
     else profiles=[normalizeProfile(null)];
     if(!profiles.length) profiles=[normalizeProfile(null)];
     const savedVersion=String(raw.meta?.appVersion||'');
-    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
+    if(!['5.1.3','5.1.4','5.2.0','5.2.1','5.3.0','5.4.0','5.4.1','5.4.2','5.4.3','5.4.4','5.5.0'].includes(savedVersion)) profiles.forEach(addEliteHuntQuest);
     const ids=new Set(); profiles.forEach(p=>{if(ids.has(p.id))p.id=uid('char');ids.add(p.id)});
     const settings={...defaultSettings(),...(raw.settings||{})};
     // v5.4.4 introduces completed grouping as the everyday default. Migrate it
     // on once for older tracker state; after v5.4.4 the player's preference is preserved.
-    if(savedVersion && savedVersion!==VERSION) settings.completedBottom=true;
+    if(savedVersion && !versionAtLeast(savedVersion,5,4,4)) settings.completedBottom=true;
     if(!['system','light','dark'].includes(settings.theme)) settings.theme='system';
     settings.sessionMinutes=SESSION_MINUTES.includes(Number(settings.sessionMinutes))?Number(settings.sessionMinutes):15;
     settings.collapsedSections={daily:false,weekly:false,...(raw.settings?.collapsedSections||{})};
@@ -141,8 +192,10 @@
     settings.collapsedCategories.weekly={...(raw.settings?.collapsedCategories?.weekly||{})};
     const cats=Array.isArray(raw.categories)?raw.categories.map(x=>norm(x).slice(0,30)).filter(Boolean):DEFAULT_CATEGORIES;
     const categories=[...new Set(['General',...cats,...profiles.flatMap(p=>[...p.daily,...p.weekly].map(t=>t.category)).filter(Boolean)])].slice(0,40);
+    const profileIdsForJournal=new Set(profiles.map(p=>p.id));
+    const journal=(Array.isArray(raw.journal)?raw.journal:[]).slice(0,MAX_JOURNAL_ITEMS).map(x=>normalizeJournalEntry(x,profileIdsForJournal)).filter(Boolean);
     return {version:5, profiles, activeProfileId:profiles.some(p=>p.id===raw.activeProfileId)?raw.activeProfileId:profiles[0].id,
-      categories, settings, history: raw.history && typeof raw.history==='object'?raw.history:{}, meta:{updatedAt:raw.meta?.updatedAt||nowISO(),createdAt:raw.meta?.createdAt||nowISO(),appVersion:VERSION}};
+      categories, settings, journal, history: raw.history && typeof raw.history==='object'?raw.history:{}, meta:{updatedAt:raw.meta?.updatedAt||nowISO(),createdAt:raw.meta?.createdAt||nowISO(),appVersion:VERSION}};
   }
 
   let app = loadApp();
@@ -163,6 +216,7 @@
   let sfxCtx=null;
   let celebrationTimer=null;
   let organizeMode=false;
+  let journalFilter='all';
   let mobileSection='daily-card';
   const theme=$('theme-audio');
 
@@ -279,7 +333,7 @@
   function renderKindWithMotion(kind,before,focusId=null,tone='reflow'){
     renderKind(kind);requestAnimationFrame(()=>animateTaskLayout(kind,before,focusId,tone));
   }
-  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); }
+  function renderAll(){ rolloverAll(); applyTheme(); applyCharacterAccent(); renderCharacters(); renderKind('daily'); renderKind('weekly'); renderQuick(); renderAllCharacters(); renderJournal(); renderSessionPlanner(); renderSettings(); renderCloudUI(); updateSnapshotCount(); document.body.classList.toggle('compact',!!app.settings.compact); document.body.classList.toggle('finish-mode',!!app.settings.finishMode); document.body.classList.toggle('organize-mode',organizeMode); }
   function renderCharacters(){
     const root=$('character-tabs'); root.replaceChildren();
     app.profiles.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='character-tab'+(p.id===app.activeProfileId?' active':''); b.dataset.profile=p.id; b.style.setProperty('--tab-accent',accentColor(p.accent)); b.innerHTML=`<span class="character-avatar">${escapeHTML(p.avatar)}</span><span>${escapeHTML(p.name)}${p.className?`<small> · ${escapeHTML(p.className)}</small>`:''}</span>`; b.addEventListener('click',()=>{app.activeProfileId=p.id;saveLocal('Character switched');renderAll();});root.append(b); });
@@ -297,10 +351,15 @@
   }
   function plannerCandidates(){
     const p=active(),resetMs=nextDailyReset(new Date())-new Date(),urgentReset=resetMs<=2*3600000;
-    return [...p.daily.map(task=>({task,kind:'daily'})),...p.weekly.map(task=>({task,kind:'weekly'}))].filter(x=>!x.task.done).map(x=>{
+    const quests=[...p.daily.map(task=>({source:'quest',task,kind:'daily'})),...p.weekly.map(task=>({source:'quest',task,kind:'weekly'}))].filter(x=>!x.task.done).map(x=>{
       const t=x.task,duration=clamp(Number(t.durationMin)||10,1,240);let score=(t.priority||0)*100+(t.favorite?65:0)+(x.kind==='daily'?15:0)+(urgentReset&&x.kind==='daily'?120:0)-Math.min(duration,90)*.35;
       return {...x,duration,score};
-    }).sort((a,b)=>b.score-a.score||a.duration-b.duration||a.task.name.localeCompare(b.task.name));
+    });
+    const journal=(app.journal||[]).filter(entry=>entry.pinned&&!entry.done&&(entry.profileId===''||entry.profileId===p.id)).map(entry=>{
+      const duration=clamp(Number(entry.durationMin)||10,1,240);
+      return {source:'journal',entry,duration,score:240+(entry.priority||0)*100-Math.min(duration,90)*.35};
+    });
+    return [...journal,...quests].sort((a,b)=>b.score-a.score||a.duration-b.duration||((a.task?.name||a.entry?.title||'').localeCompare(b.task?.name||b.entry?.title||'')));
   }
   function renderSessionPlanner(){
     const root=$('session-plan-list'),select=$('session-minutes');if(!root||!select)return;
@@ -308,9 +367,96 @@
     let remaining=minutes,total=0;const picked=[],candidates=plannerCandidates();
     for(const item of candidates){if(item.duration<=remaining){picked.push(item);remaining-=item.duration;total+=item.duration}}
     setText('session-plan-summary',picked.length?`${total} min planned`:`${minutes} min available`);
-    if(!picked.length){const empty=document.createElement('div');empty.className='empty-state compact-empty';const shortest=[...candidates].sort((a,b)=>a.duration-b.duration)[0];empty.textContent=shortest?`No unfinished quest fits in ${minutes} minutes. Shortest estimate: ${shortest.duration} minutes.`:'No unfinished quests. Your checklist is clear!';root.append(empty);return;}
-    picked.forEach(({task,kind,duration})=>{const row=document.createElement('button');row.type='button';row.className='session-plan-item';row.innerHTML=`<span>${kind==='daily'?'☀️':'✦'}</span><span><strong>${escapeHTML(task.name)}</strong><small>${kind==='daily'?'Daily':'Weekly'}${task.priority>=2?` · ${priorityLabel(task.priority)}`:''}${task.favorite?' · ★ Favorite':''}</small></span><b>~${duration}m</b>`;row.addEventListener('click',()=>{app.settings.collapsedSections[kind]=false;app.settings.collapsedCategories[kind][task.category]=false;renderKind(kind);const target=$(`${kind}-card`);target?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{const quest=document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);quest?.classList.add('planner-highlight');quest?.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>quest?.classList.remove('planner-highlight'),1500)},350)});root.append(row)});
+    if(!picked.length){const empty=document.createElement('div');empty.className='empty-state compact-empty';const shortest=[...candidates].sort((a,b)=>a.duration-b.duration)[0];empty.textContent=shortest?`Nothing unfinished fits in ${minutes} minutes. Shortest estimate: ${shortest.duration} minutes.`:'Nothing unfinished is waiting. Your checklist is clear!';root.append(empty);return;}
+    picked.forEach(item=>{
+      const row=document.createElement('button');row.type='button';row.className='session-plan-item';
+      if(item.source==='journal'){
+        const {entry,duration}=item,meta=journalTypeMeta(entry.type);
+        row.innerHTML=`<span>📌</span><span><strong>${escapeHTML(entry.title)}</strong><small>Journal · ${escapeHTML(meta.label)}${entry.priority>=2?` · ${priorityLabel(entry.priority)}`:''}</small></span><b>~${duration}m</b>`;
+        row.addEventListener('click',()=>{journalFilter='all';renderJournal();$('journal-card')?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{const card=document.querySelector(`[data-journal-id="${CSS.escape(entry.id)}"]`);card?.classList.add('planner-highlight');card?.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>card?.classList.remove('planner-highlight'),1500)},350)});
+      }else{
+        const {task,kind,duration}=item;
+        row.innerHTML=`<span>${kind==='daily'?'☀️':'✦'}</span><span><strong>${escapeHTML(task.name)}</strong><small>${kind==='daily'?'Daily':'Weekly'}${task.priority>=2?` · ${priorityLabel(task.priority)}`:''}${task.favorite?' · ★ Favorite':''}</small></span><b>~${duration}m</b>`;
+        row.addEventListener('click',()=>{app.settings.collapsedSections[kind]=false;app.settings.collapsedCategories[kind][task.category]=false;renderKind(kind);const target=$(`${kind}-card`);target?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{const quest=document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);quest?.classList.add('planner-highlight');quest?.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>quest?.classList.remove('planner-highlight'),1500)},350)});
+      }
+      root.append(row);
+    });
   }
+
+
+  function journalCharacterLabel(entry){
+    if(!entry.profileId)return 'Shared';
+    const p=app.profiles.find(x=>x.id===entry.profileId);return p?`${p.avatar} ${p.name}`:'Shared';
+  }
+  function captureJournalLayout(){
+    const map=new Map();$$('#journal-list .journal-item').forEach(row=>{const id=row.dataset.journalId;if(id)map.set(id,row.getBoundingClientRect())});return map;
+  }
+  function animateJournalLayout(before,focusId=null){
+    if(!before?.size||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    $$('#journal-list .journal-item').forEach(row=>{const old=before.get(row.dataset.journalId);if(!old)return;const next=row.getBoundingClientRect(),dx=old.left-next.left,dy=old.top-next.top;if(Math.abs(dx)<.5&&Math.abs(dy)<.5)return;const a=row.animate([{transform:`translate3d(${dx}px,${dy}px,0)`},{transform:'translate3d(0,0,0)'}],{duration:360,easing:'cubic-bezier(.18,.82,.2,1)',fill:'both'});if(row.dataset.journalId===focusId)row.classList.add('journal-reflow-focus');a.onfinish=a.oncancel=()=>row.classList.remove('journal-reflow-focus')});
+  }
+  function journalFilterEntries(){
+    const all=[...(app.journal||[])];
+    if(journalFilter==='done')return all.filter(x=>x.done);
+    if(JOURNAL_TYPES.includes(journalFilter))return all.filter(x=>x.type===journalFilter&&!x.done);
+    return all;
+  }
+  function journalSort(entries){
+    return [...entries].sort((a,b)=>(Number(a.done)-Number(b.done))||(Number(b.pinned)-Number(a.pinned))||(b.priority-a.priority)||(Date.parse(b.updatedAt||0)-Date.parse(a.updatedAt||0)));
+  }
+  function renderJournalFilters(){
+    const root=$('journal-filters');if(!root)return;root.replaceChildren();
+    const defs=[['all','All'],['inbox','Inbox'],['need','Needs'],['goal','Goals'],['trade','Trade House'],['dream','Dreams'],['done','Accomplished']];
+    defs.forEach(([key,label])=>{const count=key==='all'?(app.journal||[]).length:key==='done'?(app.journal||[]).filter(x=>x.done).length:(app.journal||[]).filter(x=>x.type===key&&!x.done).length;const b=document.createElement('button');b.type='button';b.className='journal-filter'+(journalFilter===key?' active':'');b.dataset.journalFilter=key;b.innerHTML=`<span>${escapeHTML(label)}</span><small>${count}</small>`;b.addEventListener('click',()=>{journalFilter=key;renderJournal()});root.append(b)});
+  }
+  function renderJournal(){
+    const root=$('journal-list');if(!root)return;
+    renderJournalFilters();root.replaceChildren();
+    const all=app.journal||[],activeCount=all.filter(x=>!x.done).length,doneCount=all.length-activeCount;
+    setText('journal-summary',`${activeCount} active · ${doneCount} accomplished`);
+    let entries=journalSort(journalFilterEntries());
+    if(!entries.length){const e=document.createElement('div');e.className='journal-empty';e.innerHTML=journalFilter==='all'?'<strong>Your Adventure Journal is ready.</strong><span>Quick-capture a card, goal, Trade House item, achievement, or dream and organize it later.</span>':'<strong>Nothing here yet.</strong><span>Add something or choose another Journal filter.</span>';root.append(e);return;}
+    let dividerAdded=false;
+    entries.forEach(entry=>{
+      if(entry.done&&journalFilter!=='done'&&!dividerAdded){dividerAdded=true;const d=document.createElement('div');d.className='journal-completed-divider';d.innerHTML=`<span>✓ Accomplished</span><small>${entries.filter(x=>x.done).length}</small>`;root.append(d)}
+      root.append(renderJournalCard(entry));
+    });
+  }
+  function renderJournalCard(entry){
+    const meta=journalTypeMeta(entry.type),card=document.createElement('article');card.className=`journal-item${entry.done?' done':''}${entry.pinned?' pinned':''}`;card.dataset.journalId=entry.id;
+    const check=document.createElement('label');check.className='journal-check';const input=document.createElement('input');input.type='checkbox';input.checked=entry.done;input.setAttribute('aria-label',`${entry.done?'Restore':'Complete'} ${entry.title}`);input.addEventListener('change',()=>commitJournalProgress(entry,input.checked?(entry.target||1):0));check.append(input);card.append(check);
+    const main=document.createElement('div');main.className='journal-item-main';
+    const title=document.createElement('div');title.className='journal-item-title';title.innerHTML=`<span class="journal-type-icon" aria-hidden="true">${meta.icon}</span><strong>${escapeHTML(entry.title)}</strong>`;main.append(title);
+    const tags=document.createElement('div');tags.className='journal-tags';const tag=(text,cls='')=>{const x=document.createElement('span');x.className=`journal-tag ${cls}`.trim();x.textContent=text;tags.append(x)};tag(meta.label,'type');tag(journalCharacterLabel(entry),'character');if(entry.priority>=2)tag(priorityLabel(entry.priority),entry.priority===3?'urgent':'high');if(entry.targetPrice)tag(`💰 ${entry.targetPrice}`,'price');if(entry.pinned)tag('📌 Today','pin');main.append(tags);
+    if((entry.target||1)>1){const progress=document.createElement('div');progress.className='journal-progress';const pct=Math.round((entry.current||0)/(entry.target||1)*100);progress.innerHTML=`<span style="width:${pct}%"></span><small>${entry.current||0} / ${entry.target||1}</small>`;main.append(progress)}
+    if(entry.note){const details=document.createElement('details');details.className='journal-note';details.innerHTML=`<summary>Notes</summary><p>${escapeHTML(entry.note)}</p>`;main.append(details)}
+    card.append(main);
+    const actions=document.createElement('div');actions.className='journal-item-actions';
+    if((entry.target||1)>1&&!entry.done){const minus=document.createElement('button');minus.type='button';minus.textContent='−';minus.title='Decrease progress';minus.disabled=(entry.current||0)<=0;minus.addEventListener('click',()=>commitJournalProgress(entry,(entry.current||0)-1));const value=document.createElement('span');value.textContent=`${entry.current||0}/${entry.target||1}`;const plus=document.createElement('button');plus.type='button';plus.textContent='＋';plus.title='Increase progress';plus.addEventListener('click',()=>commitJournalProgress(entry,(entry.current||0)+1));actions.append(minus,value,plus)}
+    const edit=document.createElement('button');edit.type='button';edit.className='journal-edit';edit.textContent='Edit';edit.addEventListener('click',()=>openJournalDialog(entry.id));actions.append(edit);card.append(actions);return card;
+  }
+  function commitJournalProgress(entry,value){
+    const before=captureJournalLayout(),wasDone=entry.done;setJournalProgress(entry,value);saveLocal(entry.done&&!wasDone?'Journal item accomplished':'Journal progress changed');renderJournal();renderSessionPlanner();requestAnimationFrame(()=>animateJournalLayout(before,entry.id));if(entry.done&&!wasDone)toast(`Accomplished: ${entry.title}`,'good');
+  }
+  function quickAddJournal(title,fromDialog=false){
+    const value=norm(title).slice(0,100);if(!value){toast('Type something to remember.','bad');return false;}if((app.journal||[]).length>=MAX_JOURNAL_ITEMS){toast('Adventure Journal has reached its 500-item limit.','bad');return false;}
+    const entry=makeJournalEntry(value,{type:'inbox',profileId:active().id});app.journal.unshift(entry);journalFilter='all';saveLocal('Journal quick capture');renderJournal();renderSessionPlanner();if(fromDialog)$('journal-quick-dialog')?.close('saved');toast('Saved to Adventure Journal Inbox.','good');return true;
+  }
+  function populateJournalProfileSelect(selected=''){
+    const select=$('journal-profile');if(!select)return;select.replaceChildren();const shared=document.createElement('option');shared.value='';shared.textContent='🌐 Shared / any character';select.append(shared);app.profiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.avatar} ${p.name}${p.className?` · ${p.className}`:''}`;select.append(o)});select.value=app.profiles.some(p=>p.id===selected)?selected:'';
+  }
+  function openJournalDialog(id=null){
+    const entry=id?(app.journal||[]).find(x=>x.id===id):null;$('journal-id').value=entry?.id||'';$('journal-dialog-title').textContent=entry?'Edit Journal Item':'Add Journal Item';$('journal-title').value=entry?.title||'';$('journal-type').value=entry?.type||'inbox';populateJournalProfileSelect(entry?.profileId??active().id);$('journal-priority').value=String(entry?.priority||0);$('journal-current').value=String(entry?.current||0);$('journal-target').value=String(entry?.target||1);$('journal-current').max=String(entry?.target||1);$('journal-price').value=entry?.targetPrice||'';$('journal-duration').value=String(entry?.durationMin||10);$('journal-note').value=entry?.note||'';$('journal-pinned').checked=!!entry?.pinned;$('journal-delete').hidden=!entry;const d=$('journal-dialog');if(d&&!d.open)d.showModal();setTimeout(()=>$('journal-title')?.focus(),40);
+  }
+  function saveJournalDialog(){
+    const id=$('journal-id').value,title=norm($('journal-title').value).slice(0,100);if(!title){toast('Enter a Journal item.','bad');return false;}let entry=id?(app.journal||[]).find(x=>x.id===id):null;if(!entry){if((app.journal||[]).length>=MAX_JOURNAL_ITEMS){toast('Adventure Journal has reached its 500-item limit.','bad');return false;}entry=makeJournalEntry(title);app.journal.unshift(entry)}
+    entry.title=title;entry.type=JOURNAL_TYPES.includes($('journal-type').value)?$('journal-type').value:'inbox';entry.profileId=app.profiles.some(p=>p.id===$('journal-profile').value)?$('journal-profile').value:'';entry.priority=clamp(Math.round(Number($('journal-priority').value)||0),0,3);entry.target=clamp(Math.round(Number($('journal-target').value)||1),1,999);entry.current=clamp(Math.round(Number($('journal-current').value)||0),0,entry.target);entry.targetPrice=norm($('journal-price').value).slice(0,80);entry.durationMin=clamp(Math.round(Number($('journal-duration').value)||10),1,240);entry.note=norm($('journal-note').value).slice(0,500);entry.done=entry.current>=entry.target;entry.pinned=$('journal-pinned').checked&&!entry.done;entry.completedAt=entry.done?(entry.completedAt||nowISO()):null;entry.updatedAt=nowISO();saveLocal('Journal item saved');renderJournal();renderSessionPlanner();return true;
+  }
+  function deleteJournalItem(){
+    const id=$('journal-id').value;if(!id)return;const entry=(app.journal||[]).find(x=>x.id===id);if(!entry)return;if(!confirm(`Delete “${entry.title}” from your Adventure Journal?`))return;createSnapshot('Before deleting Journal item');app.journal=app.journal.filter(x=>x.id!==id);saveLocal('Journal item deleted');$('journal-dialog')?.close('deleted');renderJournal();renderSessionPlanner();toast('Journal item deleted.');
+  }
+  function openJournalQuickDialog(){const d=$('journal-quick-dialog');if(!d)return;$('journal-quick-dialog-input').value='';if(!d.open)d.showModal();setTimeout(()=>$('journal-quick-dialog-input')?.focus(),40)}
+
 
   function renderQuick(){
     const p=active(), dd=p.daily.filter(t=>t.done).length, wd=p.weekly.filter(t=>t.done).length;
@@ -640,7 +786,7 @@
 
   function openCharacterDialog(id=null){ const p=id?app.profiles.find(x=>x.id===id):null;$('character-id').value=p?.id||'';$('character-dialog-title').textContent=p?'Edit character':'Add character';$('character-name').value=p?.name||'';$('character-class').value=p?.className||'';$('character-avatar').value=p?.avatar||'⚔️';$('character-accent').value=p?.accent||CHARACTER_ACCENT_NAMES[app.profiles.length%CHARACTER_ACCENT_NAMES.length]||'gold';$('character-copy-quests').checked=!p;$('character-copy-wrap').hidden=!!p;$('character-delete').hidden=!p||app.profiles.length===1;$('character-dialog').showModal();setTimeout(()=>$('character-name').focus(),40); }
   function saveCharacter(){ const id=$('character-id').value,name=norm($('character-name').value).slice(0,40),accent=normalizeAccent($('character-accent').value);if(!name){toast('Enter a character name.','bad');return false;}if(id){const p=app.profiles.find(x=>x.id===id);p.name=name;p.className=norm($('character-class').value).slice(0,40);p.avatar=$('character-avatar').value;p.accent=accent;touch(p);}else{if(app.profiles.length>=MAX_PROFILES){toast('Maximum character count reached.','bad');return false;}const source=active();let p;if($('character-copy-quests').checked){p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent,daily:source.daily.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null})),weekly:source.weekly.map(t=>({...t,id:uid('q'),done:false,progress:0,completedAt:null}))});}else p=normalizeProfile({name,className:norm($('character-class').value),avatar:$('character-avatar').value,accent});app.profiles.push(p);app.activeProfileId=p.id;}saveLocal('Character saved');renderAll();return true; }
-  function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data?`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
+  function deleteCharacter(){ const id=$('character-id').value;if(!id||app.profiles.length===1)return;const p=app.profiles.find(x=>x.id===id);if(!confirm(`Delete ${p.name} and all of this character's tracker data? Journal items assigned to this character will become Shared.`))return;createSnapshot('Before deleting character');app.profiles=app.profiles.filter(x=>x.id!==id);(app.journal||[]).forEach(entry=>{if(entry.profileId===id){entry.profileId='';entry.updatedAt=nowISO()}});delete app.history[id];app.activeProfileId=app.profiles[0].id;saveLocal('Character deleted');$('character-dialog').close();renderAll(); }
   function populateCharacterSelect(select,selectedId){
     select.replaceChildren();
     app.profiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.avatar} ${p.name}${p.className?` · ${p.className}`:''}`;select.append(o)});
@@ -860,12 +1006,13 @@
     $$('[data-collapse]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.collapse;app.settings.collapsedSections[k]=!app.settings.collapsedSections[k];saveLocal('Section view changed');renderKind(k)}));
     $$('[data-add-task]').forEach(b=>b.addEventListener('click',()=>openTaskDialog(b.dataset.addTask)));
     $$('[data-clear-checks]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clearChecks;if(!confirm(`Clear all ${k} checks? Your quests, notes, and order will stay.`))return;const layout=captureTaskLayout(k);createSnapshot(`Before clearing ${k} checks`);active()[k].forEach(t=>{t.done=false;t.progress=0;t.completedAt=null;touch(t)});saveLocal(`${k} checks cleared`);renderKindWithMotion(k,layout,null,'reset');renderQuick();renderAllCharacters();renderSessionPlanner()}));
+    $('journal-quick-add')?.addEventListener('click',()=>{if(quickAddJournal($('journal-quick-input').value))$('journal-quick-input').value=''});$('journal-quick-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(quickAddJournal(e.currentTarget.value))e.currentTarget.value=''}});$('journal-add-detailed')?.addEventListener('click',()=>openJournalDialog());$('journal-fab')?.addEventListener('click',openJournalQuickDialog);$('journal-quick-dialog-save')?.addEventListener('click',e=>{e.preventDefault();quickAddJournal($('journal-quick-dialog-input').value,true)});$('journal-quick-dialog-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();quickAddJournal(e.currentTarget.value,true)}});$('journal-save')?.addEventListener('click',e=>{e.preventDefault();if(saveJournalDialog())$('journal-dialog')?.close('saved')});$('journal-delete')?.addEventListener('click',deleteJournalItem);$('journal-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,999);$('journal-current').max=String(target);if(Number($('journal-current').value)>target)$('journal-current').value=String(target)});
     $('task-target')?.addEventListener('input',e=>{const target=clamp(Math.round(Number(e.target.value)||1),1,99);$('task-progress').max=String(target);if(Number($('task-progress').value)>target)$('task-progress').value=String(target)});$('task-save').addEventListener('click',e=>{e.preventDefault();if(saveTaskFromDialog())$('task-dialog').close()});$('task-delete').addEventListener('click',deleteTaskFromDialog);
     $('add-character').addEventListener('click',()=>openCharacterDialog());$('edit-character').addEventListener('click',()=>openCharacterDialog(active().id));$('copy-character').addEventListener('click',openCopySetupDialog);$('copy-setup-from')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-to')?.addEventListener('change',updateCopySetupPreview);$('copy-setup-submit')?.addEventListener('click',e=>{e.preventDefault();submitCopySetup()});$('character-save').addEventListener('click',e=>{e.preventDefault();if(saveCharacter())$('character-dialog').close()});$('character-delete').addEventListener('click',deleteCharacter);
     $('open-history').addEventListener('click',()=>{renderHistory();$('history-dialog').showModal()});$('theme-toggle').addEventListener('click',()=>{app.settings.theme=effectiveTheme()==='dark'?'light':'dark';saveLocal('Theme changed');renderAll()});$('open-settings').addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});$('add-category').addEventListener('click',addCategory);$('new-category-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCategory()}});
     ['open-support','support-card-qr','footer-support','settings-support'].forEach(id=>$(id)?.addEventListener('click',openSupportDialog));$('copy-support-link')?.addEventListener('click',copySupportLink);['share-tracker','settings-share'].forEach(id=>$(id)?.addEventListener('click',shareTracker));
     const jumpTo=id=>{if($('settings-dialog')?.open)$('settings-dialog').close();requestAnimationFrame(()=>$(`${id}`)?.scrollIntoView({behavior:'smooth',block:'start'}))};
-    $('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
+    $('settings-go-journal')?.addEventListener('click',()=>jumpTo('journal-card'));$('settings-go-cloud')?.addEventListener('click',()=>jumpTo('cloud-card'));$('settings-go-backups')?.addEventListener('click',()=>jumpTo('backup-card'));$('settings-go-reminders')?.addEventListener('click',()=>jumpTo('reminder-card'));
     $$('[data-mobile-target]').forEach(btn=>btn.addEventListener('click',()=>$(btn.dataset.mobileTarget)?.scrollIntoView({behavior:'smooth',block:'start'})));$('mobile-more')?.addEventListener('click',()=>{renderSettings();$('settings-dialog').showModal()});
     $('cloud-rotate')?.addEventListener('click',cloudRotate);$('cloud-revoke')?.addEventListener('click',cloudRevoke);
     const settingMap=[['setting-hide-completed','hideCompleted'],['setting-completed-bottom','completedBottom'],['setting-compact','compact'],['setting-ui-sounds','uiSounds'],['setting-autoplay','autoplay'],['setting-finish-auto','finishAuto']];settingMap.forEach(([id,key])=>$(id).addEventListener('change',e=>{app.settings[key]=e.target.checked;if(key==='hideCompleted'&&e.target.checked)organizeMode=false;if(key==='completedBottom'&&e.target.checked){app.settings.hideCompleted=false;organizeMode=false}if(key==='autoplay'){markMusicIntroSeen();if(e.target.checked){const attempt=playMusic(true);Promise.resolve(attempt).catch(()=>{})}else pauseMusic()}saveLocal('Settings changed');renderAll()}));
@@ -876,7 +1023,7 @@
     $('cloud-create').addEventListener('click',cloudCreate);$('cloud-join').addEventListener('click',openCloudJoinDialog);$('cloud-join-paste')?.addEventListener('click',pasteCloudJoinCode);$('cloud-join-submit')?.addEventListener('click',e=>{e.preventDefault();submitCloudJoin()});$('cloud-sync-now').addEventListener('click',async()=>{try{await cloudPull(false);await cloudPush(false);toast('Cloud sync complete.','good')}catch(e){toast(e.message,'bad')}});$('cloud-copy-code').addEventListener('click',async()=>{if(!cloud)return;try{await copyText(pairCode());toast('Pairing code copied.','good')}catch(e){prompt('Copy this pairing code:',pairCode())}});$('cloud-disconnect').addEventListener('click',cloudDisconnect);
     $('reminders-enabled').addEventListener('change',async e=>{const ok=await enableReminders(e.target.checked);if(!ok)e.target.checked=false});$('reminder-hours').addEventListener('change',e=>{app.settings.reminderHours=Number(e.target.value)||2;saveLocal('Reminder timing changed');renderSettings()});$('session-minutes')?.addEventListener('change',e=>{const value=Number(e.target.value);app.settings.sessionMinutes=SESSION_MINUTES.includes(value)?value:15;saveLocal('Session planner time changed');renderSessionPlanner()});
     window.addEventListener('online',()=>{setText('network-status','Online');checkCloudHealth()});window.addEventListener('offline',()=>{setText('network-status','Offline');setText('cloud-mini','Local/offline')});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloud)cloudPull(false).catch(()=>{})});
-    const mobileButtons=$$('[data-mobile-target]');const markMobile=id=>{mobileSection=id;mobileButtons.forEach(b=>b.classList.toggle('active',b.dataset.mobileTarget===id))};mobileButtons.forEach(b=>b.addEventListener('click',()=>markMobile(b.dataset.mobileTarget)));if('IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{const visible=entries.filter(x=>x.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(visible)markMobile(visible.target.id)},{rootMargin:'-20% 0px -55% 0px',threshold:[0,.25,.5]});['daily-card','weekly-card','character-dock'].forEach(id=>{const el=$(id);if(el)observer.observe(el)});}markMobile(mobileSection);
+    const mobileButtons=$$('[data-mobile-target]');const markMobile=id=>{mobileSection=id;mobileButtons.forEach(b=>b.classList.toggle('active',b.dataset.mobileTarget===id))};mobileButtons.forEach(b=>b.addEventListener('click',()=>markMobile(b.dataset.mobileTarget)));if('IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{const visible=entries.filter(x=>x.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(visible)markMobile(visible.target.id)},{rootMargin:'-20% 0px -55% 0px',threshold:[0,.25,.5]});['daily-card','weekly-card','journal-card','character-dock'].forEach(id=>{const el=$(id);if(el)observer.observe(el)});}markMobile(mobileSection);
     window.addEventListener('storage',e=>{if(e.key===STORAGE_KEY&&e.newValue){try{const incoming=normalizeApp(JSON.parse(e.newValue));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}catch(_){}}});
     try{if(window.BroadcastChannel){const bc=new BroadcastChannel('rtnw-v5');bc.onmessage=()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const incoming=normalizeApp(JSON.parse(raw));if(Date.parse(incoming.meta.updatedAt)>=Date.parse(app.meta.updatedAt)){app=incoming;renderAll()}}}catch(_){}};}}catch(e){}
   }
