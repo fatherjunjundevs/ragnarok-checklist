@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Feedback Admin · Ragnarok: The New World Tracker</title>
-  <link rel="stylesheet" href="/assets/admin.css?v=1">
+  <link rel="stylesheet" href="/assets/admin.css?v=2">
 </head>
 <body>
   <main class="admin-shell">
@@ -32,6 +32,7 @@
           <p class="muted">Private reports submitted through the in-app feedback form.</p>
         </div>
         <div class="header-actions">
+          <a class="button-link" href="https://github.com/jmcanlas2/ragnarok-checklist/issues" target="_blank" rel="noopener noreferrer">GitHub Issues ↗</a>
           <button id="refresh-feedback" type="button">↻ Refresh</button>
           <button id="logout" type="button">Sign out</button>
         </div>
@@ -43,6 +44,7 @@
         <label>Status
           <select id="filter-status">
             <option value="all">All statuses</option>
+            <option value="open">Open only</option>
             <option value="new">New</option>
             <option value="reviewing">Reviewing</option>
             <option value="planned">Planned</option>
@@ -71,6 +73,13 @@
             <option value="other">Other</option>
           </select>
         </label>
+        <label>Sort
+          <select id="filter-sort">
+            <option value="newest">Newest submitted</option>
+            <option value="oldest">Oldest submitted</option>
+            <option value="updated">Recently updated</option>
+          </select>
+        </label>
         <label class="search-field">Search
           <input id="filter-search" type="search" placeholder="Search feedback…" autocomplete="off">
         </label>
@@ -93,9 +102,24 @@
           <p id="detail-reference" class="eyebrow"></p>
           <h2 id="detail-title">Feedback</h2>
           <p id="detail-meta" class="muted"></p>
+          <div id="detail-timeline" class="timeline-chips"></div>
         </div>
         <button class="icon-btn" value="cancel" aria-label="Close">×</button>
       </header>
+
+      <div class="workflow-panel">
+        <div>
+          <strong>Quick workflow</strong>
+          <small>Move this report through your review queue.</small>
+        </div>
+        <div id="workflow-actions" class="workflow-actions">
+          <button type="button" data-quick-status="reviewing">Start review</button>
+          <button type="button" data-quick-status="planned">Plan</button>
+          <button type="button" data-quick-status="fixed">Mark fixed</button>
+          <button type="button" data-quick-status="closed">Close</button>
+          <button type="button" data-quick-status="new">Reopen</button>
+        </div>
+      </div>
 
       <div class="detail-grid">
         <section><h3>Message</h3><p id="detail-message" class="detail-text"></p></section>
@@ -120,8 +144,14 @@
         </label>
       </div>
 
+      <div class="privacy-note">
+        🔒 <strong>Private by default.</strong> “Copy GitHub issue draft” does not publish anything. It excludes the submitter’s contact and your private admin notes so you can review the draft before putting anything in the public GitHub repository.
+      </div>
+
       <div class="dialog-actions">
-        <button id="copy-report" type="button">Copy report</button>
+        <button id="copy-report" type="button">Copy full report</button>
+        <button id="copy-issue-draft" type="button">Copy GitHub issue draft</button>
+        <button id="next-new" type="button">Next new →</button>
         <span id="detail-status-message" class="form-status" aria-live="polite"></span>
         <span class="spacer"></span>
         <button value="cancel">Close</button>
@@ -130,6 +160,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/admin.js?v=2" defer></script>
+  <script src="/assets/admin.js?v=3" defer></script>
 </body>
 </html>
